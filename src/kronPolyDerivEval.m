@@ -36,9 +36,9 @@ end
 % entry, with k=d=length(c) already having been defined.
 [nRows, nCols] = size(c{d});
 
-if length(z) ^ d == nCols
+if (length(z) ^ d == nCols)
     % No need to transpose
-elseif length(z) ^ d == nRows
+elseif (length(z) ^ d == nRows)
     % Need to transpose, otherwise dimensions will not work
     c = cellfun(@transpose, c, 'UniformOutput', false);
 else
