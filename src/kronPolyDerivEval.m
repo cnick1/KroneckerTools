@@ -1,11 +1,12 @@
 function [x] = kronPolyDerivEval(c, z, degree)
-%kronPolyDerivEval evaluates the derivative (gradient) of a Kronecker polynomial out to degree=degree
+%kronPolyDerivEval evaluates the derivative (gradient) of a Kronecker
+%polynomial out to degree=degree, assuming the coefficients are symmetric!
 %
 %  Usage:
 %     x = kronPolyDerivEval(c,z,degree);
 %
 %  Input Variables:
-%     c - coefficients of the polynomial (cell array)
+%     c - coefficients of the polynomial (cell array), assumed symmetric
 %     z - value to calculate the polynomial at (vector)
 %     degree - polynomial will be evaluated out to degree=degree
 %              (default is the length of c)
@@ -58,7 +59,8 @@ end
 zkm1 = 1;
 for k = 2:degree
     zkm1 = kron(zkm1, z);
-    x = x + k * c{k} * kron(speye(n), zkm1);
+%     x = x + k * c{k} * kron(speye(n), zkm1);
+    x = x + k * zkm1.' * reshape(c{k},n^(k-1),[]);
 end
 
 end
