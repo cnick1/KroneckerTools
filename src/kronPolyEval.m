@@ -47,6 +47,7 @@ function [x] = kronPolyEval(c,z,degree)
   elseif (length(z)^d == nRows)
       % Need to transpose, otherwise dimensions will not work
       c = cellfun(@transpose,c,'UniformOutput',false); 
+%       warning('Coefficient needed to be transposed; consider transposing to speed up.')
   else
       % Probably won't ever happen but good contingency
       warning('Dimensions of polynomial coefficients are not consistent')

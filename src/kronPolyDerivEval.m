@@ -21,6 +21,9 @@ function [x] = kronPolyDerivEval(c, z, degree)
 %  Part of the KroneckerTools repository.
 %%
 
+% Create a vec function for readability
+vec = @(X) X(:);
+
 d = length(c);
 if (nargin < 3)
     degree = d;
@@ -41,9 +44,17 @@ end
 
 zkm1 = 1;
 for k = 2:degree
-    zkm1 = kron(zkm1, z);
+%     % Naive
+%     zkm1 = kron(zkm1, z);
 %     x = x + k * c{k} * kron(speye(n), zkm1);
+    
+%     % Using kron-vec identity (level-3 vs level-2 BLAS)
+    zkm1 = kron(zkm1, z);
     x = x + k * zkm1.' * reshape(c{k},n^(k-1),[]);
+
+    % tensor_toolbox method
+%     zkm1 = symktensor(z, k-1, 1, true);
+%     x = x + k * vec(double(zkm1)).' * reshape(c{k},n^(k-1),[]);
 end
 
 end
