@@ -9,6 +9,10 @@ function [q] = h2q(h)
 % Create a vec function for readability
 vec = @(X) X(:);
 
+if ~iscell(h) & ismatrix(h) 
+    h = {h};
+end
+
 % Process inputs
 n = size(h{1},2);
 ell = length(h);
