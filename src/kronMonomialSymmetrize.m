@@ -1,12 +1,15 @@
-function [c] = kronMonomialSymmetrize(c, b, d, verbose)
-%kronMonomialSymmetrize() symmetrizes Kronecker monomial coefficients.
+function [c] = kronMonomialSymmetrize(c, n, k)
+%kronMonomialSymmetrize Symmetrizes Kronecker monomial coefficients.
 %
-%  Input Variables:
-%     c - coefficients of the Kronecker polynomial (row vector of coefficients)
-%     b - number of variables in the multinomial
-%     d - degree of the multinomial terms (c should have b^d entries)
+%   Usage: c = kronMonomialSymmetrize(c, n, k)
 %
-%  Returns: symmetrized coefficients of the multinomial
+%   Inputs:
+%      c - coefficient of the Kronecker monomial
+%      n - number of variables in the monomial
+%      k - degree of the monomial terms (c should have n^k entries)
+%
+%   Output:
+%      c - symmetrized coefficient of the monomial
 %
 %  Rewritten to leverage the tensor toolbox:
 %
@@ -17,10 +20,54 @@ function [c] = kronMonomialSymmetrize(c, b, d, verbose)
 %%
 vec = @(X) X(:);
 
-try
-    c = vec(double(symmetrize(tensor(reshape(c, ones(1, d) * b)))));
-catch
-    error('Did you clone the tensor_toolbox repo and add it to path?')
+if nargin < 3
+    k = log(length(c))/log(n);
+end
+
+if isvector(c)
+    try
+        %     c = vec(double(symmetrize(tensor(reshape(c, ones(1, k) * n)))));
+        c = vec(symmetrize(tensor(reshape(c, ones(1, k) * n))));
+    catch
+        try
+            c = vec(symmetrize(tensor(reshape(full(c), ones(1, k) * n))));
+            disp("kronMonomialSymmetrize: had to convert to full")
+        catch
+            error('Did you clone the tensor_toolbox repo and add it to path?')
+        end
+    end
+else
+    if size(c,1) == n
+        try
+            for i=1:n
+                c(i,:) = vec(symmetrize(tensor(reshape(c(i,:), ones(1, k) * n))));
+            end
+        catch
+            try
+                for i=1:n
+                    c(i,:) = vec(symmetrize(tensor(reshape(full(c(i,:)), ones(1, k) * n))));
+                end
+                disp("kronMonomialSymmetrize: had to convert to full")
+            catch
+                error('Did you clone the tensor_toolbox repo and add it to path?')
+            end
+        end
+    else
+        try
+            for i=1:n
+                c(:,i) = vec(symmetrize(tensor(reshape(c(:,i), ones(1, k) * n))));
+            end
+        catch
+            try
+                for i=1:n
+                    c(:,i) = vec(symmetrize(tensor(reshape(full(c(:,i)), ones(1, k) * n))));
+                end
+                disp("kronMonomialSymmetrize: had to convert to full")
+            catch
+                error('Did you clone the tensor_toolbox repo and add it to path?')
+            end
+        end
+    end
 end
 
 end
