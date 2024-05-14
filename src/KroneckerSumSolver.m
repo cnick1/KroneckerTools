@@ -66,8 +66,8 @@ function [x] = KroneckerSumSolver(A,b,degree,M,solver)
 
 
 if nargin < 5
-    % solver = 'chen-kressner';
-    solver = 'bartels-stewart';
+    solver = 'chen-kressner';
+    % solver = 'bartels-stewart';
 end
 
 if length(b) == 1
