@@ -66,7 +66,12 @@ function [x] = KroneckerSumSolver(A,b,degree,M,solver)
 
 
 if nargin < 5
-    solver = 'chen-kressner';
+    % solver = 'chen-kressner';
+    solver = 'bartels-stewart';
+end
+
+if length(b) == 1
+    solver = 'bartels-stewart'; % chen-kressner solver is broken for n=1 case
 end
 
 switch solver
@@ -152,12 +157,12 @@ switch solver
 
         n = length(A{1}); d = length(A);
         B = reshape(b,n*ones(1,d));
-        if n^d < 10000
-            X = laplace_small(A, B);
-        else
-            X = laplace_merge(A, B);
-        end
-        x = X(:);
+        % if n^d < 2
+        %     X = laplace_small(A, B);
+        % else
+        X = laplace_merge(A, B);
+        % end
+        x = real(X(:)); % real seems to be needed, not sure why
 end
 
 end
