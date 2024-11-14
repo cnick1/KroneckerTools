@@ -1,5 +1,5 @@
-classdef factoredArray < matlab.mixin.indexing.RedefinesBrace
-    %FACTOREDARRAY Array of polynomial coefficients with reduction basis
+classdef factoredGainArray < matlab.mixin.indexing.RedefinesBrace
+    %FACTOREDGAINARRAY Array of polynomial coefficients with reduction basis
     %factor.
     %   Detailed explanation goes here
 
@@ -32,8 +32,8 @@ classdef factoredArray < matlab.mixin.indexing.RedefinesBrace
         end
     end
     methods (Access=public)
-        function obj = factoredArray(ReducedGains,Tinv)
-            %FACTOREDARRAY Construct an instance of this class
+        function obj = factoredGainArray(ReducedGains,Tinv)
+            %FACTOREDGAINARRAY Construct an instance of this class
             %   Detailed explanation goes here
             obj.ReducedGains = ReducedGains;
             obj.Tinv = Tinv;

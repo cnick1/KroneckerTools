@@ -36,7 +36,7 @@ else
     end
 end
 
-if isa(c,'factoredArray')
+if isa(c,'factoredGainArray')
     %% Transpose the coefficients if required
     % ommitted for now, assuming it is correct
 
@@ -53,7 +53,30 @@ if isa(c,'factoredArray')
     z = c.Tinv*z;     zk = z;
     for k=2:degree
         zk = kron(zk,z);
-        x  = x + c.ReducedGains{k}*zk;
+        x = x + c.ReducedGains{k}*zk;
+    end
+
+elseif isa(c,'factoredValueArray')
+    %% Transpose the coefficients
+    c.ReducedValueCoefficients = cellfun(@transpose,c.ReducedValueCoefficients,'UniformOutput',false);
+
+    %% Perform polynomial evalauation
+
+    %  Special case if the linear term is an empty cell
+    if isempty(c{1})
+        n = size(c{2},1);
+        x = zeros(n,1);
+    else
+        x = c{1}*z;
+    end
+
+    % Quadratic term
+    x  = x + c.ReducedValueCoefficients{2}*kron(z,z);
+      
+    z = c.Tinv*z; zk = kron(z,z);
+    for k=3:degree
+        zk = kron(zk,z);
+        x = x + c.ReducedValueCoefficients{k}*zk;
     end
 
 else
@@ -72,7 +95,7 @@ else
         %       warning('Coefficient needed to be transposed; consider transposing to speed up.')
     else
         % Probably won't ever happen but good contingency
-        warning('Dimensions of polynomial coefficients are not consistent')
+        % warning('Dimensions of polynomial coefficients are not consistent')
     end
 
     %% Perform polynomial evalauation
