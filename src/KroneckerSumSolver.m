@@ -118,6 +118,8 @@ switch solver
         
         % Replace linear system for x with linear system for y by multiplying by (Q⊗Q⊗...⊗Q)
         b = kroneckerLeft(Q,b);
+        matrices = cell(1,k-1); % this is just for coding purposes, not much extra memory is allocated by this
+        [matrices{1:k-1}] = deal(Te);
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%    2) Solve the transformed system    %%%%%%%%%%%%%%%%%%%%%%%%%%
         % Solve ℒₖᵀᵉ(Tₐ) y = b̅ via block back substitution. We will solve k-1 systems of dimension
@@ -171,8 +173,6 @@ switch solver
             
             % ---------------------------------    Getting α    ----------------------------------
             % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
-            matrices = cell(1,k-1); % this is just for coding purposes, not much extra memory is allocated by this
-            [matrices{1:k-1}] = deal(Te);
             alpha = 1;
             for idx = 1:k-1
                 alpha = alpha * matrices{idx}(row_indices(idx), col_indices(idx));
@@ -181,12 +181,16 @@ switch solver
             % ---------------------------------    Getting β    ----------------------------------
             % Here we need to consider the k-1 other permutations
             % (Tₐ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₑ, (Tₑ⊗Tₐ⊗...⊗Tₑ)ᵢⱼ Tₑ, ..., (Tₑ⊗Tₑ⊗...⊗Tₐ)ᵢⱼ Tₑ
-            beta = 1;
+            beta = 0;
             for idx2 = 1:k-1
+                % Can probably speed this up by not using matrices here, but rather doing two inner
+                % loops with Te and a middle thing with Ta
                 matrices{idx2} = Ta; % set the idx2th matrix to Ta
+                betaTemp = 1;
                 for idx = 1:k-1
-                    beta = beta * matrices{idx}(row_indices(idx), col_indices(idx));
+                    betaTemp = betaTemp * matrices{idx}(row_indices(idx), col_indices(idx));
                 end
+                beta = beta + betaTemp;
                 matrices{idx2} = Te; % reset the idx2th matrix to Te
             end
             
@@ -216,8 +220,6 @@ switch solver
                 
                 % -------------------------------    Getting γ    --------------------------------
                 % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
-                matrices = cell(1,k-1); % this is just for coding purposes, not much extra memory is allocated by this
-                [matrices{1:k-1}] = deal(Te);
                 gamma = 1;
                 for idx = 1:k-1
                     gamma = gamma * matrices{idx}(row_indices(idx), col_indices(idx));
@@ -225,12 +227,18 @@ switch solver
                 
                 % -------------------------------    Getting δ    --------------------------------
                 % Here we need to consider the k-1 other permutations
-                delta = 1;
+                % (Tₐ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₑ, (Tₑ⊗Tₐ⊗...⊗Tₑ)ᵢⱼ Tₑ, ..., (Tₑ⊗Tₑ⊗...⊗Tₐ)ᵢⱼ Tₑ
+                delta = 0;
                 for idx2 = 1:k-1
+                    % Can probably speed this up by not using matrices here, but rather doing two inner
+                    % loops with Te and a middle thing with Ta
+                    % May also be able to vectorize
                     matrices{idx2} = Ta; % set the idx2th matrix to Ta
+                    deltaTemp = 1;
                     for idx = 1:k-1
-                        delta = delta * matrices{idx}(row_indices(idx), col_indices(idx));
+                        deltaTemp = deltaTemp * matrices{idx}(row_indices(idx), col_indices(idx));
                     end
+                    delta = delta + deltaTemp;
                     matrices{idx2} = Te; % reset the idx2th matrix to Te
                 end
                 
