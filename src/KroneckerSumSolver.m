@@ -68,7 +68,8 @@ function [x] = KroneckerSumSolver(A,b,k,E,M,solver)
 
 if nargin < 6
     % solver = 'chen-kressner';
-    solver = 'bartels-stewart';
+    % solver = 'bartels-stewart';
+    solver = 'bartels-stewart-updated';
     % solver = 'generalized-bartels-stewart';
     if nargin < 4
         E = [];
@@ -127,6 +128,7 @@ switch solver
         
         X = zeros(n,n^(k-1));
         B = reshape(b,n,n^(k-1));
+        row_indices = n*ones(1,k-1); row_indices(end) = n+1;
         for colIdx = n^(k-1):-1:1
             % ~~~~~~~~~~~~~~~~~~~~    a) Construct At    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             % At is an n x n diagonal block of ℒₖᵀᵉ(Tₐ); ℒₖᵀᵉ(Tₐ), where Tₐ and Tₑ are both upper
@@ -151,11 +153,21 @@ switch solver
             %%%     for idx = 1:k                                                              %%%
             %%%         ABij = ABij * matrices{idx}(row_indices(idx), col_indices(idx));       %%%
             %%%     end                                                                        %%%
+            %%% But we can actually do better; tt_ind2sub is somewhat expensive, and in the    %%%
+            %%% end we are always incrementing k-digit base n numbers down by one every time.  %%%
+            %%% So we can use the decreaseByOne function, and just initialize the variable     %%%
+            %%% outside of the loop as one larger than the true starting value.                %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            % At is the colIdxth coefficient along the diagonal; both α and β use the same indices, just evaluating the product of different matrices
-            row_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx));
-            col_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx));
+            % At is the colIdxth coefficient along the diagonal; both α and β use the same indices,
+            % just evaluating the product of different matrices
+            % % Direct method: use ind2sub; however, this is a bit expensive every time
+            % row_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx));
+            % col_indices = row_indices; % col_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx)); % no reason to compute it twice
+            % Efficient method: use decreaseByOne, identifying that we are incrementing one at a time
+            row_indices = decreaseByOne2(row_indices,k-1,n);
+            col_indices = row_indices; % no reason to compute it twice
+            
             
             % ---------------------------------    Getting α    ----------------------------------
             % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
@@ -186,6 +198,7 @@ switch solver
             rhs = B(:,colIdx);
             
             % Now update RHS by removing already computed things
+            col_indices = n*ones(1,k-1); col_indices(end) = n+1;
             for idx3 = n^(k-1):-1:colIdx+1
                 % The things we need to remove are n x n super-diagonal blocks of ℒₖᵀᵉ(Tₐ)
                 % multiplied with n x 1 blocks of X that have already been computed. Getting these
@@ -194,8 +207,12 @@ switch solver
                 % will have the form γ Tₐ + δ Tₑ for the same reasons as before. We just need to
                 % compute γ and δ for each of the already computed X and corresponding Aod
                 
-                row_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx));
-                col_indices = flip(tt_ind2sub(n*ones(1,k-1),idx3));
+                % % Direct method: use ind2sub; however, this is a bit expensive every time
+                % % row_indices = flip(tt_ind2sub(n*ones(1,k-1),colIdx)); % already computed, no reason to compute it again
+                % col_indices = flip(tt_ind2sub(n*ones(1,k-1),idx3));
+                % Efficient method: use decreaseByOne, identifying that we are incrementing one at a time
+                col_indices = decreaseByOne2(col_indices,k-1,n);
+                
                 
                 % -------------------------------    Getting γ    --------------------------------
                 % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
@@ -229,7 +246,7 @@ switch solver
         % Now solve for x given y by multiplying by (Z⊗Z⊗...⊗Z)
         x = real(kroneckerLeft(Z,X(:)));
         
-    case 'bartels-stewart'
+    case 'bartels-stewart-updated'
         %% k-way Bartels-Stewart Algorithm
         % We wish to solve the system ℒₖ(A)x=b. Bartels-Stewart
         % algorithm for solving consists of 3 steps:
@@ -276,9 +293,11 @@ switch solver
         X = zeros(n,n^(k-1));
         B = reshape(b,n,n^(k-1));
         jRange = cell(1,k-1);
+        jIndex = n*ones(1,k-1); jIndex(end) = n+1;
         for jj = n^(k-1):-1:1
             % jIndex is jj in k-1-digit base n; ex. [2 2 2] = 8, [2 2 1]  = 7, etc.
-            jIndex = flip(tt_ind2sub(n*ones(1,k-1),jj));
+            % jIndex = flip(tt_ind2sub(n*ones(1,k-1),jj));
+            jIndex = decreaseByOne2(jIndex,k-1,n);
             colIdx = tt_sub2ind(n*ones(1,k-1),jIndex); % colIdx doesn't exactly follow jj; I think this is because there are zero blocks that can be skipped when E = I
             
             %%% a) Construct At %%%
@@ -329,6 +348,75 @@ switch solver
         % Now solve for x given y by multiplying by (U⊗U⊗...⊗U)
         x = real(kroneckerLeft(U,X(:)));
         
+    case 'bartels-stewart'
+        %% Jeff's Original k-way Bartels-Stewart Algorithm
+        
+        %  As a simplification, we assume all A{i} are the same size.  We furthermore
+        %  assume they are all the same (so we can use the kroneckerLeft function as is)
+        %  Both of these can be easily relaxed if an application arises.
+        [U,T] = schur(A{1},'complex');
+        b = kroneckerLeft(U',b);
+        
+        L = length(A);
+        for l=1:L
+            A{l} = T;
+        end
+        
+        if nargin < 4
+            UMU = sparse(n,n);
+        else
+            UMU = U'*M*U;
+        end
+        
+        X = zeros(n,n^(k-1));
+        B = reshape(b,n,n^(k-1));
+        
+        jIndex = n*ones(1,k);  jIndex(k) = n+1;
+        jRange = cell(1,k);
+        
+        last = false;
+        while( ~last )
+            [jIndex,last] = decreaseByOne(jIndex,n);
+            
+            diagA = 0;
+            for i=2:k
+                diagA = diagA + A{i}(jIndex(i),jIndex(i));
+            end
+            At = A{1} + diagA*eye(n) + UMU;
+            
+            colIdx = jIndex(2);
+            for i=3:k
+                colIdx = colIdx + (jIndex(i)-1)*n^(i-2);
+            end
+            
+            rhs = B(:,colIdx);
+            
+            %  Backsubstitution steps
+            for i=2:k    % this could be done by decreaseByOne as well
+                jRange{i} = (jIndex(i)+1):n;
+            end
+            
+            for i=2:k
+                if (~isempty(jRange{i}))
+                    shift = 1;
+                    for j=2:(i-1)
+                        shift = shift + (jIndex(j)-1)*n^(j-2);
+                    end
+                    for j=(i+1):k
+                        shift = shift + (jIndex(j)-1)*n^(j-2);
+                    end
+                    jIdx = shift + (jRange{i}-1)*n^(i-2);
+                    
+                    rhs = rhs - X(:,jIdx)*A{i}(jIndex(i),jRange{i}).';
+                end
+            end
+            
+            X(:,colIdx) = At\rhs;
+            
+        end
+        
+        x = X(:);
+        x = real(kroneckerLeft(U,x));
     case 'chen-kressner'
         %% Chen & Kressner recursive blocked algorithm
         % The back substitution steps in Bartels-Stewart uses primarily level 2
@@ -353,4 +441,37 @@ end
 
 end
 
+
+function [jIndex,last] = decreaseByOne(jIndex,n)
+%UNTITLED Summary of this function goes here
+%   Detailed explanation goes here
+
+dp1 = length(jIndex);
+d   = dp1-1;
+
+if (jIndex(dp1)==1)
+    jIndex(dp1) = n;
+    jIndex(1:d) = decreaseByOne(jIndex(1:d),n);
+    
+else
+    jIndex(dp1) = jIndex(dp1)-1;
+    
+end
+
+last = norm(jIndex(2:end)-ones(1,d))==0;
+
+end
+
+function [jIndex] = decreaseByOne2(jIndex,k,n)
+%decreaseByOne2 Decrease jIndex, which is a k-digit number in base n, by 1
+%   Detailed explanation goes here
+
+if jIndex(k) == 1
+    jIndex(k) = n;
+    jIndex(1:k-1) = decreaseByOne2(jIndex(1:k-1),k-1,n);
+else
+    jIndex(k) = jIndex(k)-1;
+end
+
+end
 
