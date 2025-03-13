@@ -218,7 +218,7 @@ switch solver
                 end
                 
                 Aod = gamma*Ta + delta*Te;
-                rhs = rhs - Aod*X();
+                rhs = rhs - Aod*X(:,idx3);
             end
             
             % Solve for component of X
@@ -311,7 +311,7 @@ switch solver
                     for j=1:(i-1)
                         shift = shift + (jIndex(j)-1)*n^(j-1);
                     end
-                    for j=i:k-1
+                    for j=(i+1):k-1
                         shift = shift + (jIndex(j)-1)*n^(j-1);
                     end
                     jIdx = shift + (jRange{i}-1)*n^(i-1);
