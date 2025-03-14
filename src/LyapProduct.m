@@ -1,56 +1,107 @@
-function [Mv] = LyapProduct(M,v,d)
-%LyapProduct Computes the product of an N-way Lyapunov matrix with a vector v
+function LkMv = LyapProduct(M,v,k,E)
+%LyapProduct Computes the k-way Lyapunov product ℒₖ(M) v
 %
-%     Given a square matrix M, generate the product of its specialized Kronecker 
-%     sum matrix, aka its N-way Lyapunov matrix, in d dimensions.  Then compute 
-%     its product with the column vector v.
+%   Usage:  LkMv = LyapProduct(M,v,k,E);
 %
-%   Usage:  [Mv] = LyapProduct(M,v,d);
+%   Inputs:
+%       M       - matrix M, the argument of ℒₖ(M);  dimensions (m  x n)
+%       v       - vector to multiply with: ℒₖ(M) v; dimensions (nᵏ x 1)
+%       k       - degree of the Lyapunov product; determines how many
+%                 Kronecker products are in each term of ℒₖ(M)
+%       E       - mass matrix; dimensions (n x n)
+%                   (optional, defaults to E = I)
 %
-%   Mv = (M x I x I ... I + I x M x I ... I + ... + I x ... x I x M)*v
-%         |-- d terms --|   |-- d terms --|   ...   |-- d terms --|
+%   Output:
+%       LkMv     - result of the product ℒₖ(M) v
 %
-%   This arises in the Quadratic-Quadratic Regulator problem.
+%   Description: The k-way Lyapunov matrix is defined as the mnᵏ⁻¹ x nᵏ matrix
 %
-%   details are provided in
-%     Borggaard and Zietsman, The Quadratic-Quadratic Regulator: 
-%       Proc. American Conference on Control, Denver, CO, 2020.
+%            |-----------------------------------k terms-----------------|
+%   ℒₖ(M) = ( M⊗I⊗ ... ⊗I  +  I⊗M⊗ ... ⊗I  +  ...  +  I⊗I⊗ ... ⊗M )
+%            |--k factors--|    |--k factors--|    ...    |--k factors--|
 %
-%   Details about how to run this function, including necessary libraries
-%   and example scripts, can be found at https://github.com/jborggaard/QQR
+%   This matrix is very large and expensive to compute due to the storage
+%   requirements; however, all of the information is contained in the
+%   argument M, and typically the matrix ℒₖ(M) is not needed, but rather
+%   its product with a vector ℒₖ(M) v is of interest. In this case, the
+%   Kronecker product can be leveraged to efficiently compute this by
+%   reshaping and permuting things to instead use matrix multiplication.
+%   This arises in the Polynomial-Polynomial Regulator problem (PPR), a
+%   generalization of the Linear-Quadratic, Quadratic-Quadratic, and
+%   Polynomial-Quadratic Regulators (LQR, QQR, PQR). Details are provided
+%   in [1-3].
 %
-%  Author: Jeff Borggaard, Virginia Tech
+%   Optionally, the function can be passed a mass matrix E that replaces
+%   the identity matrices, i.e. to define
 %
-%  Part of the KroneckerTools repository: github.com/jborggaard/KroneckerTools
+%       ℒₖᴱ(M) = ( M⊗E⊗...⊗E  +  E⊗M⊗...⊗E  + ... +  E⊗E⊗...⊗M )
+%
+%   Authors: Jeff Borggaard, Virginia Tech (Original author)
+%            Nicholas Corbin, UC San Diego (Update to include E matrix)
+%
+%   Reference: [1] J. Borggaard and L. Zietsman, “The quadratic-quadratic
+%               regulator problem: approximating feedback controls for
+%               quadratic-in-state nonlinear systems,” in 2020 American
+%               Control Conference (ACC), Jul. 2020, pp. 818–823. doi:
+%               10.23919/ACC45564.2020.9147286
+%              [2] J. Borggaard and L. Zietsman, “On approximating
+%               polynomial-quadratic regulator problems,” IFAC-PapersOnLine,
+%               vol. 54, no. 9, pp. 329–334, 2021, doi:
+%               10.1016/j.ifacol.2021.06.090.
+%              [3] N. A. Corbin and B. Kramer, "Computing solutions to the
+%               polynomial-polynomial regulator problem,” in 2024 63rd IEEE
+%               Conference on Decision and Control, Dec. 2024
+%              [4] E. G. Al’brekht, “On the optimal stabilization of
+%               nonlinear systems," Journal of Applied Mathematics and
+%               Mechanics, vol. 25, no. 5, pp. 1254–1266, Jan. 1961, doi:
+%               10.1016/0021-8928(61)90005-3
+%              [5] D. L. Lukes, “Optimal regulation of nonlinear dynamical
+%               systems,” SIAM Journal on Control, vol. 7, no. 1, pp.
+%               75–100, Feb. 1969, doi: 10.1137/0307007
+%
+%   Part of the KroneckerTools repository: github.com/cnick1/KroneckerTools
 %%
+vec = @(X) X(:);
+[m,n] = size(M);
 
-  [m,n] = size(M);
-  t     = size(v,1);  % right now, we are assuming v is a single column
-  if ( t ~= n^d )
-    error('The dimensions of v do not match the degree of the multiLyapunov matrix')
-  end
-  
-  if (d<2)
-    error('d must be >=2')
-  end
-  
-  V = reshape(v,n^(d-1),n);
-  Mv = reshape(V*M.',m*n^(d-1),1);      % compute the first term in the sum
-  
-  V = reshape(v,n,n^(d-1));
-  Mv = Mv + reshape(M*V,m*n^(d-1),1);   % compute the last term in the sum
-  
-  for l=1:d-2                           % loop to compute the rest
-    V1 = reshape(v,n^(d-l),n^l);
+if ( size(v,1) ~= n^k ); error('The dimensions of v do not match the degree of the k-way Lyapunov matrix'); end % Right now, we are assuming v is a single column
+if ( k<2 ); error('k must be >= 2'); end
+
+if nargin < 4 || isempty(E) % no mass matrix E
+    % Compute the first and last terms in the sum
+    LkMv =        vec( reshape(v,n^(k-1),n) * M.' );
+    LkMv = LkMv + vec( M * reshape(v,n,n^(k-1)) );
     
-    mat = zeros(m*n^(d-l-1),n^l);
-    for i=1:n^l
-      vi = V1(:,i);
-      mat(:,i) = reshape( reshape(vi,n^(d-l-1),n)*M.', m*n^(d-l-1),1);
+    % Loop to compute the remaining permutations
+    for l=1:k-2
+        V1 = reshape(v, n^(k-l), n^l);
+        
+        mat = zeros(m*n^(k-l-1), n^l);
+        for i=1:n^l
+            vi = V1(:, i);
+            mat(:, i) = vec( reshape(vi,n^(k-l-1),n) * M.' );
+        end
+        LkMv = LkMv + vec(mat);
     end
-    Mv = Mv + reshape(mat,m*n^(d-1),1);
-  end
-  
-  Mv = Mv(:); % redundant?
+else % with mass matrix E
+    % Compute the first and last terms in the sum
+    LkMv =        vec(  kroneckerLeft(E, reshape(v,n^(k-1),n) * M.') );
+    LkMv = LkMv + vec( kroneckerRight(M * reshape(v,n,n^(k-1)), E.')   );
+    
+    % Loop to compute the remaining permutations
+    for l=1:k-2
+        V1 = reshape(v,n^(k-l),n^l);
+        
+        mat = zeros(m*n^(k-l-1),n^l);
+        for i=1:n^l
+            vi = V1(:,i);
+            mat(:,i) = vec( kroneckerLeft(E, reshape(vi,n^(k-l-1),n)*M.') );
+        end
+        LkMv = LkMv + vec( kroneckerRight(mat, E.') );
+    end
+    
+end
+
+LkMv = LkMv(:); % redundant?
 end
 

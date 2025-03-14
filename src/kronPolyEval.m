@@ -36,6 +36,11 @@ else
     end
 end
 
+if degree == 0
+    x = 0; 
+    return 
+end
+
 if isa(c,'factoredGainArray')
     %% Transpose the coefficients if required
     % ommitted for now, assuming it is correct
@@ -116,4 +121,4 @@ else
 
 end
 
-end % function kronPolyEval
+end
