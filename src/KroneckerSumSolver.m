@@ -173,10 +173,16 @@ switch solver
             
             % ---------------------------------    Getting α    ----------------------------------
             % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
-            alpha = 1;
-            for idx = 1:k-1
-                alpha = alpha * matrices{idx}(row_indices(idx), col_indices(idx));
-            end
+            % alpha = 1;
+            % for idx = 1:k-1
+            %     alpha = alpha * matrices{idx}(row_indices(idx), col_indices(idx));
+            % end
+            
+            % Vectorized approach:
+            % Apply sub2ind type operation to the index pairs
+            ind = row_indices + (col_indices - 1).*n; % basically sub2ind
+            alpha = prod(Te(ind));
+            
             
             % ---------------------------------    Getting β    ----------------------------------
             % Here we need to consider the k-1 other permutations
@@ -220,10 +226,15 @@ switch solver
                 
                 % -------------------------------    Getting γ    --------------------------------
                 % Here we just need to get (Tₑ⊗Tₑ⊗...⊗Tₑ)ᵢⱼ Tₐ
-                gamma = 1;
-                for idx = 1:k-1
-                    gamma = gamma * matrices{idx}(row_indices(idx), col_indices(idx));
-                end
+                % gamma = 1;
+                % for idx = 1:k-1
+                %     gamma = gamma * matrices{idx}(row_indices(idx), col_indices(idx));
+                % end
+                
+                % Vectorized approach:
+                % Apply sub2ind type operation to the index pairs
+                ind = row_indices + (col_indices - 1).*n; % basically sub2ind
+                gamma = prod(Te(ind));
                 
                 % -------------------------------    Getting δ    --------------------------------
                 % Here we need to consider the k-1 other permutations
@@ -483,3 +494,28 @@ end
 
 end
 
+function ndx = sub2ind(siz,v1,v2)
+%SUB2IND Linear indices from multiple subscripts.
+%   SUB2IND is used to determine the equivalent single index
+%   corresponding to a given set of subscript values.
+%
+%   IND = SUB2IND(SIZ,I,J) returns the linear indices equivalent to the
+%   row and column subscripts in the arrays I and J for a matrix of
+%   size SIZ. 
+%
+%   See also IND2SUB.
+%
+%   This is a stripped down version of Matlab's builtin sub2ind to remove
+%   all the unnecessary overhead.
+%   Copyright 1984-2015 The MathWorks, Inc.
+
+
+
+ndx = double(v1);
+if numOfIndInput >= 2
+    %Compute linear indices
+    ndx = ndx + (double(v2) - 1).*siz(1);
+end 
+ndx = v1 + (v2 - 1).*siz(1);
+
+end
