@@ -46,6 +46,9 @@ function [X] = lyap3c(A, E, X, TRANS)
 %   Part of the KroneckerTools repository: github.com/cnick1/KroneckerTools
 %%
 N = size(A,1);
+if nargin < 4
+    TRANS = false;
+end
 
 if TRANS
     % Solve Equation (1)
