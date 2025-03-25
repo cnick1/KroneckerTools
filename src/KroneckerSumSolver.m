@@ -201,13 +201,13 @@ switch solver
             % Here we need to consider the k-1 other permutations
             % (T⊗I⊗...⊗I)ᵢⱼ I, (I⊗T⊗...⊗I)ᵢⱼ I, ..., (I⊗I⊗...⊗T)ᵢⱼ I
             % Method 1: Loop                                 ~ 36-37 sec
-            % beta = 0;
-            % for i=1:k-1
-            %     beta = beta + T(row_indices(i),row_indices(i));
-            % end
+            beta = 0;
+            for i=1:k-1
+                beta = beta + T(row_indices(i),row_indices(i));
+            end
             % Method 2: Vectorized                           ~ 36-37 sec
-            ind = row_indices + (row_indices - 1).*n; % basically sub2ind
-            beta = sum(T(ind)); % black magic
+            % ind = row_indices + (row_indices - 1).*n; % basically sub2ind
+            % beta = sum(T(ind)); % black magic
             
             
             At = T + beta*I + UMU;
@@ -219,39 +219,39 @@ switch solver
             
             % Now update RHS by removing already computed things
             % Method 1: Jeff's
-            % for i=1:k-1
-            %     jRange{i} = (row_indices(i)+1):n;
-            % end
-            % jRange = arrayfun(@(x) (x + 1):n, row_indices, 'UniformOutput', false);
-            %
-            %
-            % for i=1:k-1
-            %     if (~isempty(jRange{i}))
-            %         shift = (row_indices([1:(i-1) (i+1):k-1]) - 1) * mult([1:(i-1) (i+1):k-1]) + 1; % essentially tt_sub2ind
-            %
-            %         backSubColIdx = shift + (jRange{i}-1)*n^(i-1); % becomes a vector of same dimension as jRange{i}
-            %
-            %         deltas = T(row_indices(i),jRange{i}).';
-            %
-            %         rhs = rhs - X(:,backSubColIdx)*deltas;
-            %     end
-            % end
-            
-            % Method 2: Mix of Jeff's and mine
             for i=1:k-1
-                colIdxRange = (row_indices(i)+1):n;
-                
-                if (~isempty(colIdxRange))
+                jRange{i} = (row_indices(i)+1):n;
+            end
+            jRange = arrayfun(@(x) (x + 1):n, row_indices, 'UniformOutput', false);
+
+
+            for i=1:k-1
+                if (~isempty(jRange{i}))
                     shift = (row_indices([1:(i-1) (i+1):k-1]) - 1) * mult([1:(i-1) (i+1):k-1]) + 1; % essentially tt_sub2ind
-                    
-                    backSubColIdx = shift + (colIdxRange-1)*n^(i-1); % becomes a vector of same dimension as jRange{i}
-                    
-                    deltas = T(row_indices(i),colIdxRange).';
-                    
+
+                    backSubColIdx = shift + (jRange{i}-1)*n^(i-1); % becomes a vector of same dimension as jRange{i}
+
+                    deltas = T(row_indices(i),jRange{i}).';
+
                     rhs = rhs - X(:,backSubColIdx)*deltas;
                 end
-                
             end
+            
+            % Method 2: Mix of Jeff's and mine
+            % for i=1:k-1
+            %     colIdxRange = (row_indices(i)+1):n;
+            % 
+            %     if (~isempty(colIdxRange))
+            %         shift = (row_indices([1:(i-1) (i+1):k-1]) - 1) * mult([1:(i-1) (i+1):k-1]) + 1; % essentially tt_sub2ind
+            % 
+            %         backSubColIdx = shift + (colIdxRange-1)*n^(i-1); % becomes a vector of same dimension as jRange{i}
+            % 
+            %         deltas = T(row_indices(i),colIdxRange).';
+            % 
+            %         rhs = rhs - X(:,backSubColIdx)*deltas;
+            %     end
+            % 
+            % end
             
             % Solve for component of X
             X(:,colIdx) = At\rhs;
