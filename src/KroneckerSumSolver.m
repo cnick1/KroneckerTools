@@ -17,6 +17,7 @@ function [x] = KroneckerSumSolver(A,b,k,E,M,solver)
 %                  • 'generalized-bartels-stewart' - Nicks's generalized
 %                     N-way Bartels-Stewart that includes E matrix. If an E
 %                     matrix is included, this solver will be selected.
+%                     *** Note: b must be symmetric for the generalized solver 
 %                  • 'bartels-stewart' - Jeff's N-way Bartels-Stewart
 %                     direct solver from [1]. Described more below.
 %                  • 'chen-kressner' - calls laplace_merge() solver from

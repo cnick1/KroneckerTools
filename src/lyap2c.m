@@ -66,12 +66,12 @@ if TRANS
             % Update right-hand sides (I)
             if L > 1 % No back substitution on the first system
                 X(K:L, L) = X(K:L, L) ...
-                    - A(K, K:L)' * ( X(K, 1:L-1) * E(1:L-1, L) ) ...
-                    - E(K, K:L)' * ( X(K, 1:L-1) * A(1:L-1, L) );
+                    - A(K, K:L).' * ( X(K, 1:L-1) * E(1:L-1, L) ) ...
+                    - E(K, K:L).' * ( X(K, 1:L-1) * A(1:L-1, L) );
             end
 
             % Solve small Sylvester equations of order at most (2,2)
-            MAT = conj(E(L, L) * A(K, K)) + A(L, L) * E(K, K);
+            MAT = E(L, L) * A(K, K) + A(L, L) * E(K, K);
             RHS = X(K, L);
 
             RHS = MAT\RHS;
@@ -82,8 +82,8 @@ if TRANS
             % Update right hand sides (II).
             if K < L
                 X(K+1:L, L) = X(K+1:L, L) ...
-                    - A(K, K+1:L)' * (X(K, L) * E(L, L)) ...
-                    - E(K, K+1:L)' * (X(K, L) * A(L, L));
+                    - A(K, K+1:L).' * (X(K, L) * E(L, L)) ...
+                    - E(K, K+1:L).' * (X(K, L) * A(L, L));
             end
         end
     end
@@ -100,12 +100,12 @@ else
             % Update right-hand sides (I)
             if K < N % No back substitution on the first system
                 X(K, K:L) = X(K, K:L) ...
-                    - ( A(K, K+1:N) * X(K+1:N, L) ) * E(K:L, L)' ...
-                    - ( E(K, K+1:N) * X(K+1:N, L) ) * A(K:L, L)';
+                    - ( A(K, K+1:N) * X(K+1:N, L) ) * E(K:L, L).' ...
+                    - ( E(K, K+1:N) * X(K+1:N, L) ) * A(K:L, L).';
             end
 
             % Solve small Sylvester equations of order at most (2,2)
-            MAT = E(L, L) * A(K, K) + conj(A(L, L) * E(K, K));
+            MAT = E(L, L) * A(K, K) + A(L, L) * E(K, K);
             RHS = X(K, L);
 
             RHS = MAT\RHS;
@@ -116,8 +116,8 @@ else
             % Update right hand sides (II).
             if K < L
                 X(K, K:L-1) = X(K, K:L-1) ...
-                    - A(K, K) * X(K, L) * E(K:L-1, L)' ...
-                    - E(K, K) * X(K, L) * A(K:L-1, L)';
+                    - A(K, K) * X(K, L) * E(K:L-1, L).' ...
+                    - E(K, K) * X(K, L) * A(K:L-1, L).';
             end
         end
     end

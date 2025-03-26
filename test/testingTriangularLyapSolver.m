@@ -1,6 +1,7 @@
 %%
 
 clear;clc;
+% rng(0,'twister')
 n=3;
 A = rand(n);
 E = rand(n);
