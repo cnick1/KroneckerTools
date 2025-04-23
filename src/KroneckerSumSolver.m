@@ -125,9 +125,14 @@ switch solver
         if k == 2
             X = lyap(Ta,-b,[],Te);
         elseif k == 3
-            X = lyap3c(Ta,Te,b);
+            % X = lyap3c(Ta,Te,b);
+            % X = lyap3c2(Ta,Te,b); % uses temporary variable to recycle duplicate operations 
+            X = lyap3c2_mex(Ta,Te,b,false); % compiled C++ version 
         elseif k == 4
-            X = lyap4c(Ta,Te,b);
+            % X = lyap4c(Ta,Te,b);
+            % X = lyap4c2(Ta,Te,b); % uses temporary variable to recycle duplicate operations (seems to work best)
+            X = lyap4c2_mex(Ta,Te,b,false); % compiled C++ version 
+            % X = lyap4c3(Ta,Te,b); % tries to do better memory allocation (not much difference)
         else
             warning("lyapkc: this solver is inefficient and may take a long time")
             X = lyapkc(Ta,Te,b,k);
