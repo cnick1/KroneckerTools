@@ -1,13 +1,16 @@
-function [FofX] = kronPolyEval(f,x,d)
+function [FofX] = kronPolyEval(f,x,d,sprse)
 %kronPolyEval Evaluate a Kronecker polynomial f(x) to degree d.
 %
 %   Usage:     FofX = kronPolyEval(f,x,d);
 %
 %   Input Variables:
-%     f - cell array containing function coefficients
-%     x - point at which to evaluate the Jacobian (vector)
-%     d - polynomial will be evaluated out to degree=d
-%         (default is the length of f)
+%          f - cell array containing function coefficients
+%          x - point at which to evaluate the Jacobian (vector)
+%          d - polynomial will be evaluated out to degree=d
+%              (default is the length of f)
+%      sprse - optional; exploit sparsity if it is present
+%              (defaults to true; permits NOT exploiting
+%               sparsity if necessary for some reason)
 %
 %   Description: The function f(x) of interest is a polynomial
 %
@@ -31,6 +34,14 @@ function [FofX] = kronPolyEval(f,x,d)
 %         This function can handle these cases using the factoredGainArray class
 %         and factoredValueArray class, which basically pass along the reduced
 %         coefficients and the reduction basis T.
+%       - Sparse coefficients can be handled; here we have a general-purpose
+%         implementation, but in cases where performance is critical and
+%         repeated evaluation of the SAME polynomial are performed,
+%         additional special case speed-ups can be made that give MAJOR
+%         improvements. If performance is critical, my current approach is 
+%         to make a local function sparseKronPolyEval() to keep the code 
+%         simple and make any other speedups I can. See runExample29() in 
+%         the PPR repository for an example. 
 %
 %   Author: Rewritten by Nick Corbin, UCSD
 %           Based on original version by Jeff Borggaard, Virginia Tech
@@ -40,10 +51,13 @@ function [FofX] = kronPolyEval(f,x,d)
 %   Part of the KroneckerTools repository.
 %%
 lf = length(f);
-if (nargin<3)
-    d = lf;
+if nargin < 4
+    sprse = true;
+    if nargin < 3
+        d = lf;
+    end
 end
-if (lf<d)
+if lf < d
     error('kronPolyEval: not enough entries in the coefficient cell array')
 end
 if d == 0
@@ -82,6 +96,35 @@ elseif isa(f,'factoredValueArray')
         xk = kron(xk,x);
         FofX = FofX + f.ReducedValueCoefficients{k}*xk;
     end
+elseif sprse && issparse(f{end})
+    %% Evaluate sparse Kronecker polynomial
+    % Note: in the case of REPEATED evaluation of THE SAME sparse
+    % Kronecker polynomial, a MAJOR improvement can be obtained by using
+    % persistent variables to find and store the sparsity pattern of the
+    % coefficients. If performance is that critical,  my current approach is 
+    % making a local function sparseKronPolyEval() to keep the code simple
+    % and make any other speedups I can. See runExample29() in the PPR
+    % repository for an example. This is just a general case without all of
+    % the possible special cases speed-ups that are possible.
+    n = length(x);
+    
+    % Assume transposition not needed, and assume linear term not empty
+    FofX = f{1}*x;
+    
+    % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
+    for k=2:d
+        [Fi, Fj, Fv] = find(f{k});
+        inds = cell(1, k); % Preallocate cell array for k indices
+        [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
+        
+        % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
+        zprod = ones(size(Fj));
+        for p = 1:k
+            zprod = zprod .* z(inds{p});
+        end
+        
+        FofX = FofX + accumarray(Fi, Fv .* zprod, size(x));
+    end
 else
     %% Evaluate standard Kronecker polynomial
     %% Transpose the coefficients if required
@@ -117,7 +160,6 @@ else
         xk = kron(xk,x);
         FofX  = FofX + f{k}*xk;
     end
-    
 end
 
 end
