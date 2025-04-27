@@ -36,17 +36,19 @@ classdef sparseCSR
     properties (Access = private)
         StoredTransposed
     end
-    
+
     methods
         function obj = sparseCSR(varargin)
             % Custom sparse constructor to flip size before building
-            
-            if nargin == 2 && isnumeric(varargin{1}) && isnumeric(varargin{2})
+
+            if nargin == 1 && isstruct(varargin{1})
+                obj.StoredTransposed = varargin{1}.StoredTransposed;
+            elseif nargin == 2 && isnumeric(varargin{1}) && isnumeric(varargin{2})
                 % Called like sparse(m,n)
                 m = varargin{1};
                 n = varargin{2};
                 obj.StoredTransposed = sparse(n,m); % FLIP before calling sparse!
-                
+
             elseif nargin >= 5 && isnumeric(varargin{1}) && isnumeric(varargin{2}) && isnumeric(varargin{3})
                 % Called like sparse(i,j,s,m,n)
                 i = varargin{1};
@@ -62,7 +64,7 @@ classdef sparseCSR
                 obj.StoredTransposed = A.';  % Worst case: safe fallback
             end
         end
-        
+
         function s = size(obj, dim)
             sz = size(obj.StoredTransposed);
             sz = fliplr(sz);
@@ -72,48 +74,54 @@ classdef sparseCSR
                 s = sz;
             end
         end
-        
+
         function result = length(obj)
             result = length(obj.StoredTransposed.');
         end
-        
+
         function B = full(obj)
             B = full(obj.StoredTransposed.');
         end
-        
+
         function varargout = find(obj, varargin)
             [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:});
         end
-        
+
         function varargout = norm(obj, varargin)
             if nargin < 2
                 varargin = {'inf'};
                 fprintf('  (sparseCSR: defaulting to inf norm)\n')
             end
-            [varargout{1:nargout}] = norm(obj.StoredTransposed.', varargin{:});
+            if  strcmp(varargin{1},'inf')
+                [varargout{1:nargout}] = norm(obj.StoredTransposed, 1); % inf norm = 1 norm for transpose (much faster)
+            elseif varargin{1} == 1
+                [varargout{1:nargout}] = norm(obj.StoredTransposed, 'inf'); % inf norm = 1 norm for transpose (much faster)
+            else
+                [varargout{1:nargout}] = norm(obj.StoredTransposed.', varargin{:});
+            end
         end
-        
+
         function spy(obj)
             spy(obj.StoredTransposed.');
         end
-        
+
         function disp(obj)
             disp(obj.StoredTransposed.')
         end
-        
+
         function n = nnz(obj)
             n = nnz(obj.StoredTransposed);
         end
-        
+
         function n = issparse(~)
             n = true;
         end
-        
+
         function result = transpose(obj)
             result = obj.StoredTransposed;
         end
-        
-        
+
+
         function varargout = subsref(obj, S)
             switch S(1).type
                 case '()'
@@ -133,19 +141,19 @@ classdef sparseCSR
                     if length(S) > 1
                         [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
                     end
-                    
+
                 case '.'
                     [varargout{1:nargout}] = builtin('subsref', obj, S);
-                    
-                    
+
+
                 case '{}'
                     error('Brace indexing is not supported for variables of this type.')
-                    
+
                 otherwise
                     error('Unsupported indexing type.')
             end
         end
-        
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% Standard algebraic operations
         function result = plus(obj, other)
@@ -161,21 +169,30 @@ classdef sparseCSR
                 result = sparseCSR(obj.StoredTransposed.' + other);
             end
         end
-        
+
         function result = minus(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
-                result = minus(other, obj)*-1;
-                return
-            end
-            if isscalar(other)
-                result = obj.StoredTransposed.' - other; % will be converted to full
-            elseif isa(other,'sparseCSR')
-                result = sparseCSR((obj.StoredTransposed - other.StoredTransposed).');
+                % result = minus(other, obj)*-1;
+                % return
+                if isscalar(obj)
+                    result = obj - other.StoredTransposed.'; % will be converted to full
+                else
+                    result.StoredTransposed = obj.' - other.StoredTransposed;
+                    result = sparseCSR(result); % now just reclassify this struct as a sparseCSR object
+                end
             else
-                result = sparseCSR(obj.StoredTransposed.' - other);
+                if isscalar(other)
+                    result = obj.StoredTransposed.' - other; % will be converted to full
+                elseif isa(other,'sparseCSR')
+                    result = sparseCSR((obj.StoredTransposed - other.StoredTransposed).');
+                else
+                    % result = sparseCSR(obj.StoredTransposed.' - other);
+                    result.StoredTransposed = obj.StoredTransposed - other.'; % do the operation on the transposed arrays
+                    result = sparseCSR(result); % now just reclassify this struct as a sparseCSR object
+                end
             end
         end
-        
+
         function result = times(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
                 result = sparseCSR(obj .* other.StoredTransposed.');
@@ -183,7 +200,7 @@ classdef sparseCSR
                 result = sparseCSR(obj.StoredTransposed.' .* other);
             end
         end
-        
+
         function result = rdivide(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
                 result = sparseCSR(obj ./ other.StoredTransposed.');
@@ -191,7 +208,7 @@ classdef sparseCSR
                 result = sparseCSR(obj.StoredTransposed.' ./ other);
             end
         end
-        
+
         %% Standard linear algebra operations
         function result = mtimes(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
@@ -206,7 +223,7 @@ classdef sparseCSR
                 result = obj.StoredTransposed.' * other; % don't worry about casting it as sparseCSR because if it is a vector, second dimension will contract
             end
         end
-        
+
         function result = mldivide(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
                 error("sparseCSR: A\B only implemented for A being sparseCSR")
@@ -218,7 +235,7 @@ classdef sparseCSR
                 end
             end
         end
-        
+
         function result = mrdivide(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
                 error("sparseCSR: A/B only implemented for A being sparseCSR")
@@ -230,6 +247,6 @@ classdef sparseCSR
                 end
             end
         end
-        
+
     end
 end
