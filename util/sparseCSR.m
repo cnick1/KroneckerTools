@@ -65,15 +65,27 @@ classdef sparseCSR
             end
         end
 
-        function s = size(obj, dim)
+        function varargout = size(obj, dim)
             sz = size(obj.StoredTransposed);
             sz = fliplr(sz);
+
             if nargin == 2
-                s = sz(dim);
+                varargout{1} = sz(dim);
             else
-                s = sz;
+                if nargout <= 1
+                    varargout{1} = sz;
+                else
+                    for k = 1:nargout
+                        if k <= numel(sz)
+                            varargout{k} = sz(k);
+                        else
+                            varargout{k} = 1; % MATLAB behavior: size returns 1 for extra dimensions
+                        end
+                    end
+                end
             end
         end
+
 
         function result = length(obj)
             result = length(obj.StoredTransposed.');
