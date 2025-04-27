@@ -118,12 +118,12 @@ elseif sprse && issparse(f{end})
         [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
         
         % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
-        zprod = ones(size(Fj));
+        xprod = ones(size(Fj));
         for p = 1:k
-            zprod = zprod .* z(inds{p});
+            xprod = xprod .* x(inds{p});
         end
         
-        FofX = FofX + accumarray(Fi, Fv .* zprod, size(x));
+        FofX = FofX + accumarray(Fi, Fv .* xprod, size(x));
     end
 else
     %% Evaluate standard Kronecker polynomial
