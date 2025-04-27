@@ -6,12 +6,12 @@ classdef factoredValueArray < matlab.mixin.indexing.RedefinesParen & ...
     %   efficiently the value function in PPR when reduction is used. The
     %   value function is written in an approximate form in terms of the
     %   reduced-order state x≈Txᵣ as
-    %       V(x) =    1/2 ( v₂ᵀ(x⊗x) + v₃ᵣᵀ(xᵣ⊗xᵣ⊗xᵣ) + ... +   vᵣᵈᵀ(...⊗xᵣ) )
+    %       V(x) = 1/2 ( v₂ᵀ(x⊗x) + v₃ᵣᵀ(xᵣ⊗xᵣ⊗xᵣ) + ... + vᵣᵈᵀ(...⊗xᵣ) )
     %   The full-order value coefficients are therefore approximated as
-    %       v₂ = v₂                           (Note: in practice, the T we are
-    %       v₃ ≈ (T⁻¹⊗T⁻¹⊗T⁻¹)ᵀ v₃ᵣ           using is orthogonal, so T⁻¹=Tᵀ)
-    %   This class stores the gains {K₁,K₂ᵣ,...} and the transformation
-    %   coefficient (and its inverse) {T,T⁻¹}.
+    %       v₂ = v₂                        (Note: in practice, the T we are
+    %       v₃ ≈ (T⁻¹⊗T⁻¹⊗T⁻¹)ᵀv₃ᵣ        using is orthogonal, so T⁻¹=Tᵀ)
+    %   This class stores the value coefficients {v₁,v₂ᵣ,...} and the
+    %   transformation coefficient (and its inverse) {T,T⁻¹}.
     %
     %   An important feature of this class is its integration with the
     %   kronPolyEval() function. To evaluate V(x), kronPolyEval()

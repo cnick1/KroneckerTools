@@ -5,11 +5,11 @@ classdef factoredGainArray < matlab.mixin.indexing.RedefinesBrace
     %   efficiently the feedback law in PPR when reduction is used. The
     %   feedback law is written in an approximate form in terms of the
     %   reduced-order state x≈Txᵣ as
-    %       u(x) = K₁ x + K₂ᵣ(xᵣ⊗xᵣ) +  K₃ᵣ(xᵣ⊗xᵣ⊗xᵣ) + ... +  Kᵣᵈ⁻¹(...⊗xᵣ) )
+    %       u(x) = K₁x + K₂ᵣ(xᵣ⊗xᵣ) + K₃ᵣ(xᵣ⊗xᵣ⊗xᵣ) + ... + Kᵣᵈ⁻¹(...⊗xᵣ) )
     %   The full-order gain coefficients are therefore approximated as
     %       K₁ = K₁
-    %       K₂ ≈ K₂ᵣ(T⁻¹⊗T⁻¹)                (Note: in practice, the T we are
-    %       K₃ ≈ K₃ᵣ(T⁻¹⊗T⁻¹⊗T⁻¹)            using is orthogonal, so T⁻¹=Tᵀ)
+    %       K₂ ≈ K₂ᵣ(T⁻¹⊗T⁻¹)             (Note: in practice, the T we are
+    %       K₃ ≈ K₃ᵣ(T⁻¹⊗T⁻¹⊗T⁻¹)         using is orthogonal, so T⁻¹=Tᵀ)
     %   This class stores the gains {K₁,K₂ᵣ,...} and the transformation
     %   coefficient (and its inverse) {T,T⁻¹}.
     %
