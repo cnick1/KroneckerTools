@@ -85,6 +85,14 @@ classdef sparseCSR
             [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:});
         end
         
+        function varargout = norm(obj, varargin)
+            if nargin < 2
+                varargin = {'inf'};
+                fprintf('  (sparseCSR: defaulting to inf norm)\n')
+            end
+            [varargout{1:nargout}] = norm(obj.StoredTransposed.', varargin{:});
+        end
+        
         function spy(obj)
             spy(obj.StoredTransposed.');
         end
@@ -96,28 +104,132 @@ classdef sparseCSR
         function n = nnz(obj)
             n = nnz(obj.StoredTransposed);
         end
-
+        
         function n = issparse(~)
             n = true;
         end
-
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        function result = transpose(obj)
+            result = obj.StoredTransposed;
+        end
+        
         
         function varargout = subsref(obj, S)
             switch S(1).type
                 case '()'
-                    [i,j] = deal(S(1).subs{:});
-                    varargout{1} = obj.StoredTransposed(j,i);
+                    if isscalar(S(1).subs)
+                        % Linear index: obj(i)
+                        idx = S(1).subs{1};
+                        if length(idx) > 1; error('sparseCSR: multiple linear indexing not currently supported'); end
+                        [i,j] = ind2sub(size(obj),idx);
+                        varargout{1} = obj.StoredTransposed(j,i);
+                    elseif numel(S(1).subs) == 2
+                        % 2D index: obj(i, j)
+                        [i,j] = deal(S(1).subs{:});
+                        varargout{1} = obj.StoredTransposed(j,i);
+                    else
+                        error('Unsupported indexing type.')
+                    end
                     if length(S) > 1
                         [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
                     end
+                    
                 case '.'
                     [varargout{1:nargout}] = builtin('subsref', obj, S);
+                    
+                    
+                case '{}'
+                    error('Brace indexing is not supported for variables of this type.')
+                    
                 otherwise
                     error('Unsupported indexing type.')
             end
         end
         
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %% Standard algebraic operations
+        function result = plus(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                result = plus(other, obj);
+                return
+            end
+            if isscalar(other)
+                result = obj.StoredTransposed.' + other; % will be converted to full
+            elseif isa(other,'sparseCSR')
+                result = sparseCSR((obj.StoredTransposed + other.StoredTransposed).');
+            else
+                result = sparseCSR(obj.StoredTransposed.' + other);
+            end
+        end
+        
+        function result = minus(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                result = minus(other, obj)*-1;
+                return
+            end
+            if isscalar(other)
+                result = obj.StoredTransposed.' - other; % will be converted to full
+            elseif isa(other,'sparseCSR')
+                result = sparseCSR((obj.StoredTransposed - other.StoredTransposed).');
+            else
+                result = sparseCSR(obj.StoredTransposed.' - other);
+            end
+        end
+        
+        function result = times(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                result = sparseCSR(obj .* other.StoredTransposed.');
+            else
+                result = sparseCSR(obj.StoredTransposed.' .* other);
+            end
+        end
+        
+        function result = rdivide(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                result = sparseCSR(obj ./ other.StoredTransposed.');
+            else
+                result = sparseCSR(obj.StoredTransposed.' ./ other);
+            end
+        end
+        
+        %% Standard linear algebra operations
+        function result = mtimes(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                result = mtimes(other.', obj.').';
+                return
+            end
+            % Currently just worried about handling case when
+            % other is a vector; could make this more advanced
+            if isscalar(other)
+                result = sparseCSR(obj.StoredTransposed.' * other);
+            else
+                result = obj.StoredTransposed.' * other; % don't worry about casting it as sparseCSR because if it is a vector, second dimension will contract
+            end
+        end
+        
+        function result = mldivide(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                error("sparseCSR: A\B only implemented for A being sparseCSR")
+            else
+                if isscalar(other)
+                    result = sparseCSR(obj.StoredTransposed.' \ other);
+                else
+                    result = obj.StoredTransposed.' \ other;
+                end
+            end
+        end
+        
+        function result = mrdivide(obj, other)
+            if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
+                error("sparseCSR: A/B only implemented for A being sparseCSR")
+            else
+                if isscalar(other)
+                    result = sparseCSR(obj.StoredTransposed.' / other);
+                else
+                    result = obj.StoredTransposed.' / other;
+                end
+            end
+        end
         
     end
 end
