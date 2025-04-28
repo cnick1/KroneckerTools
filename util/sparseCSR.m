@@ -96,7 +96,20 @@ classdef sparseCSR
         end
 
         function varargout = find(obj, varargin)
-            [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:});
+            % Naive
+            % [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:});
+
+            % Efficient
+            [varargout{1:nargout}] = find(obj.StoredTransposed, varargin{:});
+            switch nargout
+                case 1
+                    % Do nothing
+                case 2 
+                    varargout = fliplr(vargout);
+                case 3
+                    varargout([1 2]) = varargout([2 1]);
+            end
+
         end
 
         function varargout = norm(obj, varargin)
