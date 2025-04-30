@@ -1,5 +1,5 @@
 classdef sparseCSR
-    %sparseCSR Wrapper for storing short/wide sparse arrays by transposing them
+    %SPARSECSR Wrapper for storing short/wide sparse arrays by transposing them
     %
     %   Usage: Identical to sparse() (mostly)
     %
@@ -38,7 +38,7 @@ classdef sparseCSR
     %
     %   These three approaches can be compared on the finite element example
     %   example in getSystem29 in the PPR repository. See sparseIJV for more
-    %   background. The quadratic coefficient is all zeros, and in that case 
+    %   background. The quadratic coefficient is all zeros, and in that case
     %   sparseIJV is best:
     %     >> n=4225; S0=sparse(n,n^2); S1=sparseCSR(n,n^2); S2=sparseIJV(n,n^2);
     %     >> whos S0 S1 S2
@@ -89,7 +89,7 @@ classdef sparseCSR
         StoredTransposed
     end
     
-    methods
+    methods (Access = public)
         function obj = sparseCSR(varargin)
             % Custom sparse constructor to flip size before building
             
@@ -117,6 +117,59 @@ classdef sparseCSR
             end
         end
         
+        function varargout = subsref(obj, S)
+            switch S(1).type
+                case '()'
+                    if isscalar(S(1).subs)
+                        % Linear index: obj(i)
+                        idx = S(1).subs{1};
+                        if length(idx) > 1; error('sparseCSR: multiple linear indexing not currently supported'); end
+                        [i,j] = ind2sub(size(obj),idx);
+                        varargout{1} = obj.StoredTransposed(j,i);
+                    elseif numel(S(1).subs) == 2
+                        % 2D index: obj(i, j)
+                        i = S(1).subs{1};
+                        j = S(1).subs{2};
+                        varargout{1} = obj.StoredTransposed(j,i).';
+                    else
+                        error('Only 1D or 2D indexing supported.')
+                    end
+                    
+                    if length(S) > 1
+                        [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
+                    end
+                    
+                case '.'
+                    [varargout{1:nargout}] = builtin('subsref', obj, S);
+                    
+                    
+                case '{}'
+                    error('Brace indexing is not supported for variables of this type.')
+                    
+                otherwise
+                    error('Unsupported indexing type.')
+            end
+        end
+        
+        function obj = subsasgn(obj, S, value)
+            switch S(1).type
+                case '()'
+                    if numel(S(1).subs) ~= 2
+                        error('sparseCSR: only 2D indexing assignment is currently supported');
+                    end
+                    i = S(1).subs{1};
+                    j = S(1).subs{2};
+
+                    % Modify transposed sparse array in place, just swapping i and j
+                    obj.StoredTransposed(j, i) = value;
+                    
+                otherwise
+                    obj = builtin('subsasgn', obj, S, value);
+            end
+        end
+        
+        
+        
         function varargout = size(obj, dim)
             sz = size(obj.StoredTransposed);
             sz = fliplr(sz);
@@ -137,7 +190,6 @@ classdef sparseCSR
                 end
             end
         end
-        
         
         function result = length(obj)
             result = length(obj.StoredTransposed.');
@@ -181,12 +233,26 @@ classdef sparseCSR
             end
         end
         
-        function spy(obj, varargin)
-            if nargin > 1
-                spy(obj.StoredTransposed.', varargin);
-            else
-                spy(obj.StoredTransposed.');
+        function spy(obj)
+            figure; % modified custom simplified version of Matlab's spy for sparseCSR
+            
+            [I,J,V] = find(obj);
+            [M,N] = size(obj);
+            if ~isempty(I)
+                maxSize = max(M+1, N+1);
+                markersize = round(8*(log10(2500./maxSize)));
+                markersize = max(4, min(14, markersize));
+                p = plot(J,I,'marker','.','markersize',markersize,'linestyle','none','SeriesIndex',1);
+                delete(datatip(p)); % Start datatip mode
+                p.DataTipTemplate.DataTipRows = p.DataTipTemplate.DataTipRows([2 1]);
+                p.DataTipTemplate.DataTipRows(1).Label = getString(message('MATLAB:spy:Row'));
+                p.DataTipTemplate.DataTipRows(2).Label = getString(message('MATLAB:spy:Column'));
+                p.DataTipTemplate.DataTipRows(3) = dataTipTextRow(getString(message('MATLAB:spy:Value')), string(V));
             end
+            xlabel(['nz = ' int2str(nnz(obj))]);
+            % Aspect ratio is never more than a factor 10 between rows and columns
+            aspectRatio = [min(N+1, 10*(M+1)), min(M+1, 10*(N+1)), 1];
+            set(gca,'xlim',[0 N+1],'ylim',[0 M+1],'ydir','reverse','plotboxaspectratio',aspectRatio);
         end
         
         function disp(obj)
@@ -203,39 +269,6 @@ classdef sparseCSR
         
         function result = transpose(obj)
             result = obj.StoredTransposed;
-        end
-        
-        
-        function varargout = subsref(obj, S)
-            switch S(1).type
-                case '()'
-                    if isscalar(S(1).subs)
-                        % Linear index: obj(i)
-                        idx = S(1).subs{1};
-                        if length(idx) > 1; error('sparseCSR: multiple linear indexing not currently supported'); end
-                        [i,j] = ind2sub(size(obj),idx);
-                        varargout{1} = obj.StoredTransposed(j,i);
-                    elseif numel(S(1).subs) == 2
-                        % 2D index: obj(i, j)
-                        [i,j] = deal(S(1).subs{:});
-                        varargout{1} = obj.StoredTransposed(j,i).';
-                    else
-                        error('Unsupported indexing type.')
-                    end
-                    if length(S) > 1
-                        [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
-                    end
-                    
-                case '.'
-                    [varargout{1:nargout}] = builtin('subsref', obj, S);
-                    
-                    
-                case '{}'
-                    error('Brace indexing is not supported for variables of this type.')
-                    
-                otherwise
-                    error('Unsupported indexing type.')
-            end
         end
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,5 +1,5 @@
 classdef sparseIJV
-    %sparseIJV Class for storing sparse arrays using row/column indices and value arrays
+    %SPARSEIJV Class for storing sparse arrays using row/column indices and value arrays
     %
     %   Usage: Identical to sparse() (mostly)
     %
@@ -120,7 +120,7 @@ classdef sparseIJV
         N
     end
     
-    methods
+    methods (Access = public)
         function obj = sparseIJV(varargin)
             if nargin == 1 && isstruct(varargin{1})
                 % Externally constructed as a struct, just convert it to a sparseIJV class
@@ -173,6 +173,108 @@ classdef sparseIJV
                 S = sparseCSR(varargin{:});
                 [obj.I,obj.J,obj.V] = find(S);
                 [obj.M,obj.N] = size(S);
+            end
+        end
+        
+        function varargout = subsref(obj, S)
+            switch S(1).type
+                case '()'
+                    if isscalar(S(1).subs)
+                        % Linear indexing: obj(i)
+                        k = S(1).subs{1};
+                        if length(k) > 1; error('sparseIJV: multiple linear indexing not currently supported'); end
+                        [i, j] = ind2sub([obj.M, obj.N], k);
+                        val = getValueAt(obj, i, j);
+                        varargout{1} = val;
+                        
+                    elseif numel(S(1).subs) == 2
+                        % 2D index: obj(i, j)
+                        i = S(1).subs{1};
+                        j = S(1).subs{2};
+                        
+                        % Handle ':' shorthand
+                        if ischar(i) && strcmp(i, ':')
+                            i = 1:obj.M;
+                        end
+                        if ischar(j) && strcmp(j, ':')
+                            j = 1:obj.N;
+                        end
+                        
+                        % Return a sparse matrix result
+                        val = sparse(length(i), length(j));
+                        [I_grid, J_grid] = ndgrid(i, j); % needed to get all pairs
+                        linear_I = I_grid(:);
+                        linear_J = J_grid(:);
+                        
+                        % Lookup each (i,j) pair
+                        for idx = 1:numel(linear_I)
+                            val(idx) = getValueAt(obj, linear_I(idx), linear_J(idx));
+                        end
+                        
+                        varargout{1} = reshape(val, size(I_grid));
+                    else
+                        error('Only 1D or 2D indexing supported.')
+                    end
+                    
+                    if length(S) > 1
+                        [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
+                    end
+                    
+                case '.'
+                    [varargout{1:nargout}] = builtin('subsref', obj, S);
+                    
+                case '{}'
+                    error('Brace indexing is not supported for variables of this type.');
+                    
+                otherwise
+                    error('Unsupported indexing type.');
+            end
+        end
+        
+        function obj = subsasgn(obj, S, value)
+            switch S(1).type
+                case '()'
+                    if numel(S(1).subs) ~= 2
+                        error('sparseIJV: only 2D indexing assignment is currently supported');
+                    end
+                    i = S(1).subs{1};
+                    j = S(1).subs{2};
+                    
+                    if ischar(i) && strcmp(i, ':'); i = 1:obj.M; end
+                    if ischar(j) && strcmp(j, ':'); j = 1:obj.N; end
+                    
+                    [Igrid, Jgrid] = ndgrid(i, j);
+                    linear_i = Igrid(:);
+                    linear_j = Jgrid(:);
+                    value = value(:);
+                    
+                    if isscalar(value)
+                        % Expand scalar to full size
+                        value = repmat(value, length(linear_i), 1);
+                    elseif length(value) ~= length(linear_i)
+                        error('sparseIJV: Value size does not match indexing.');
+                    end
+                    
+                    % Remove existing entries at those (i,j)
+                    mask = true(length(obj.I), 1);
+                    for k = 1:length(obj.I)
+                        if any(obj.I(k) == linear_i & obj.J(k) == linear_j)
+                            mask(k) = false;
+                        end
+                    end
+                    
+                    obj.I = obj.I(mask);
+                    obj.J = obj.J(mask);
+                    obj.V = obj.V(mask);
+                    
+                    % Add new values, excluding zeros
+                    nonzero = value ~= 0;
+                    obj.I = [obj.I; linear_i(nonzero)];
+                    obj.J = [obj.J; linear_j(nonzero)];
+                    obj.V = [obj.V; value(nonzero)];
+                    
+                otherwise
+                    obj = builtin('subsasgn', obj, S, value);
             end
         end
         
@@ -299,61 +401,6 @@ classdef sparseIJV
             result = sparseIJV(obj.J, obj.I, obj.V, obj.N, obj.M);
         end
         
-        
-        function varargout = subsref(obj, S)
-            switch S(1).type
-                case '()'
-                    if isscalar(S(1).subs)
-                        % Linear indexing: A(k)
-                        k = S(1).subs{1};
-                        if length(k) > 1; error('sparseCSR: multiple linear indexing not currently supported'); end
-                        [i, j] = ind2sub([obj.M, obj.N], k);
-                        val = getValueAt(obj, i, j);
-                        varargout{1} = val;
-                        
-                    elseif numel(S(1).subs) == 2
-                        i = S(1).subs{1};
-                        j = S(1).subs{2};
-                        
-                        % Handle ':' shorthand
-                        if ischar(i) && strcmp(i, ':')
-                            i = 1:obj.M;
-                        end
-                        if ischar(j) && strcmp(j, ':')
-                            j = 1:obj.N;
-                        end
-                        
-                        % Return a sparse matrix result
-                        val = sparse(length(i), length(j));
-                        [I_grid, J_grid] = ndgrid(i, j); % needed to get all pairs
-                        linear_I = I_grid(:);
-                        linear_J = J_grid(:);
-                        
-                        % Lookup each (i,j) pair
-                        for idx = 1:numel(linear_I)
-                            val(idx) = getValueAt(obj, linear_I(idx), linear_J(idx));
-                        end
-                        
-                        varargout{1} = reshape(val, size(I_grid));
-                    else
-                        error('Only 1D or 2D indexing supported.')
-                    end
-                    
-                    if length(S) > 1
-                        [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
-                    end
-                    
-                case '.'
-                    [varargout{1:nargout}] = builtin('subsref', obj, S);
-                    
-                case '{}'
-                    error('Brace indexing is not supported for variables of this type.');
-                    
-                otherwise
-                    error('Unsupported indexing type.');
-            end
-        end
-        
         function val = getValueAt(obj, i, j)
             % Helper for indexing
             idx = find(obj.I == i & obj.J == j, 1);
@@ -363,7 +410,6 @@ classdef sparseIJV
                 val = obj.V(idx);
             end
         end
-        
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% Standard algebraic operations
