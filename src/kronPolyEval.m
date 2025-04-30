@@ -113,7 +113,7 @@ elseif sprse && issparse(f{end})
     
     % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
     for k=2:d
-        [Fi, Fj, Fv] = find(f{k});
+        [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars
         inds = cell(1, k); % Preallocate cell array for k indices
         [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
         

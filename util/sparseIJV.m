@@ -7,10 +7,11 @@ classdef sparseIJV
     %   format. This means that the storage requirements are drastically
     %   different for short/wide vs tall/skinny arrays. This can be
     %   verified easily:
-    %   >> A=sparse(100,100^3);B=sparse(100^3,100); whos
-    %        Name           Size            Bytes     Class     Attributes
-    %         A         100x1000000        8000024    double      sparse
-    %         B         1000000x100          824      double      sparse
+    %     >> A=sparse(100,100^3);B=sparse(100^3,100);
+    %     >> whos
+    %         Name           Size            Bytes     Class     Attributes
+    %          A         100x1000000        8000024    double      sparse
+    %          B         1000000x100            824    double      sparse
     %   So even though these are both all zero sparse arrays, they have
     %   drastically different storage requirements. In fact, the number of
     %   rows has no impact on the storage, it is primarily the number of
@@ -46,6 +47,45 @@ classdef sparseIJV
     %   have something that looks and quacks like an array. This is primarily
     %   done by overloading key methods.
     %
+    %   The result and benefit of this approach can be verified easily.
+    %   Here are some examples from a custom nonlinear finite element code
+    %   (getSystem29 in the PPR repository). We will consider the case of a
+    %   2D mesh with 64 elements, leading to n=4225 degrees of freedom.
+    %   First, (quite straightforward) for all zero arrays, e.g. the
+    %   quadratic stiffness coefficient for this example, we see a major
+    %   improvement (this is not unexpected; Matlab sparse arrays are not
+    %   optimized to be empty after all):
+    %     >> n=4225; S0=sparse(n,n^2); S1=sparseCSR(n,n^2); S2=sparseIJV(n,n^2);
+    %     >> whos S0 S1 S2
+    %         Name           Size            Bytes     Class     Attributes
+    %          S0       4225x17850625     142805024    double      sparse
+    %          S1       4225x17850625         33824   sparseCSR    sparse
+    %          S2       4225x17850625            16   sparseIJV    sparse
+    %   Just to reiterate, these are all zero arrays, i.e. the only things
+    %   to store are the dimensions, but the way that the arrays are set up
+    %   requires different amounts of memory. A more interesting case is an
+    %   array that is not all zeros; the cubic stiffness coefficient in the
+    %   finite element example is such a case. The I, J, and V values are
+    %   computed in a loop that assembles the element matrices using the
+    %   connectivity matrix. Then we can construct the full coefficient
+    %   using the different sparse array classes:
+    %     >> S1 = sparseCSR(I, J, V, n, n^3); S2 = sparseIJV(I, J, V, n, n^3);
+    %     >> whos S1 S2
+    %         Name          Size             Bytes     Class     Attributes
+    %          S0           fails            > 4e12    double      sparse
+    %          S1      4225x75418890625     4566048   sparseCSR    sparse
+    %          S2      4225x75418890625    22020128   sparseIJV    sparse
+    %   So actually sparseCSR is the best in this case memory wise; however,
+    %   since it is still based on sparse(), it does hit a wall due to
+    %   Matlab's maximum array size of 2^48 - 1. So for larger models, even
+    %   though sparseIJV is less memory efficient than sparseCSR, it is the
+    %   only option. (Either way, the efficient USE of these sparse arrays
+    %   ---e.g. in PPR when computing the ROM dynamics or when simulating
+    %   with kronPolyEval---is based on calling find() to get the nonzero
+    %   entries, so it is possible that sparseIJV actually is more efficient
+    %   because you don't then have to store the results when you call find,
+    %   it should just be using pointers to the data fields in the struct.)
+    %
     %   Here is a list of the overloaded methods:
     %       Constructor:
     %           S = sparseIJV(m,n) creates an all zero m x n sparse array,
@@ -58,11 +98,6 @@ classdef sparseIJV
     %           size, length, find, norm, disp, transpose
     %       Sparse characteristics:
     %           full, spy, nnz, issparse
-    %       Scalar algebra:
-    %           plus, minus, times, rdivide
-    %       Matrix algebra:
-    %           plus, minus, mtimes, mldivide, mrdivide
-    %
     %       Scalar algebra:
     %           plus, minus, times, rdivide
     %       Matrix algebra:
@@ -84,7 +119,7 @@ classdef sparseIJV
         M
         N
     end
-
+    
     methods
         function obj = sparseIJV(varargin)
             if nargin == 1 && isstruct(varargin{1})
@@ -134,16 +169,16 @@ classdef sparseIJV
                 i = double(c(:)-32);
                 j = cumsum(diff([0; i])<=0) + 1;
                 spy(sparseIJV(i,j,1,100,67)); title("(my dog, not your sparseIJV array)")
-
+                
                 S = sparseCSR(varargin{:});
                 [obj.I,obj.J,obj.V] = find(S);
                 [obj.M,obj.N] = size(S);
             end
         end
-
+        
         function varargout = size(obj, dim)
             sz = [obj.M, obj.N];
-
+            
             if nargin == 2
                 varargout{1} = sz(dim);
             else
@@ -161,11 +196,11 @@ classdef sparseIJV
                 end
             end
         end
-
+        
         function result = length(obj)
             result = max([obj.M, obj.N]);
         end
-
+        
         function B = full(obj)
             warning("sparseIJV: converting large sparseIJV to full is probably a bad idea")
             if obj.N > obj.M
@@ -174,7 +209,7 @@ classdef sparseIJV
                 B = full(sparse(obj.I, obj.J, obj.V, obj.M, obj.N));
             end
         end
-
+        
         function varargout = find(obj, varargin)
             switch nargout
                 case {0, 1}
@@ -193,13 +228,13 @@ classdef sparseIJV
                     error('Too many output arguments.');
             end
         end
-
+        
         function result = norm(obj, norm_type)
             if nargin < 2
                 norm_type = 'inf';
                 fprintf('  (sparseIJV: defaulting to inf norm)\n')
             end
-
+            
             switch norm_type
                 case 'inf'
                     % Infinity norm: max row sum
@@ -216,7 +251,7 @@ classdef sparseIJV
                     error("sparseIJV: only '1', 'inf', and 'fro' norms are supported.")
             end
         end
-
+        
         function spy(obj)
             figure; % modified custom simplified version of Matlab's spy for sparseIJV
             if ~isempty(obj.I)
@@ -235,7 +270,7 @@ classdef sparseIJV
             aspectRatio = [min(obj.N+1, 10*(obj.M+1)), min(obj.M+1, 10*(obj.N+1)), 1];
             set(gca,'xlim',[0 obj.N+1],'ylim',[0 obj.M+1],'ydir','reverse','plotboxaspectratio',aspectRatio);
         end
-
+        
         function disp(obj)
             if isempty(obj.I)
                 fprintf("   All zero sparse: %i×%i\n\n",obj.M, obj.N)
@@ -243,28 +278,28 @@ classdef sparseIJV
                 % Vectorized approach
                 fprintf("   (%i,%i)        %1.4f\n", [obj.I(:), obj.J(:), obj.V(:)].');  % Transpose to match fprintf column-wise reading
                 fprintf("\n")
-
+                
                 % Loop-based approach
                 % for i = 1:length(obj.V)
                 %     fprintf("   (%i,%i)        %1.4f\n", obj.I(i), obj.J(i), obj.V(i))
                 % end
-
+                
             end
         end
-
+        
         function n = nnz(obj)
             n = length(obj.I);
         end
-
+        
         function n = issparse(~)
             n = true;
         end
-
+        
         function result = transpose(obj)
             result = sparseIJV(obj.J, obj.I, obj.V, obj.N, obj.M);
         end
-
-
+        
+        
         function varargout = subsref(obj, S)
             switch S(1).type
                 case '()'
@@ -275,11 +310,11 @@ classdef sparseIJV
                         [i, j] = ind2sub([obj.M, obj.N], k);
                         val = getValueAt(obj, i, j);
                         varargout{1} = val;
-
+                        
                     elseif numel(S(1).subs) == 2
                         i = S(1).subs{1};
                         j = S(1).subs{2};
-
+                        
                         % Handle ':' shorthand
                         if ischar(i) && strcmp(i, ':')
                             i = 1:obj.M;
@@ -287,38 +322,38 @@ classdef sparseIJV
                         if ischar(j) && strcmp(j, ':')
                             j = 1:obj.N;
                         end
-
+                        
                         % Return a sparse matrix result
                         val = sparse(length(i), length(j));
                         [I_grid, J_grid] = ndgrid(i, j); % needed to get all pairs
                         linear_I = I_grid(:);
                         linear_J = J_grid(:);
-
+                        
                         % Lookup each (i,j) pair
                         for idx = 1:numel(linear_I)
                             val(idx) = getValueAt(obj, linear_I(idx), linear_J(idx));
                         end
-
+                        
                         varargout{1} = reshape(val, size(I_grid));
                     else
                         error('Only 1D or 2D indexing supported.')
                     end
-
+                    
                     if length(S) > 1
                         [varargout{1:nargout}] = builtin('subsref', varargout{1}, S(2:end));
                     end
-
+                    
                 case '.'
                     [varargout{1:nargout}] = builtin('subsref', obj, S);
-
+                    
                 case '{}'
                     error('Brace indexing is not supported for variables of this type.');
-
+                    
                 otherwise
                     error('Unsupported indexing type.');
             end
         end
-
+        
         function val = getValueAt(obj, i, j)
             % Helper for indexing
             idx = find(obj.I == i & obj.J == j, 1);
@@ -328,8 +363,8 @@ classdef sparseIJV
                 val = obj.V(idx);
             end
         end
-
-
+        
+        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %% Standard algebraic operations
         function result = plus(obj, other)
@@ -341,29 +376,29 @@ classdef sparseIJV
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
                 end
-
+                
                 % Combine (I, J, V) entries from both objects
                 I_combined = [obj.I; other.I];
                 J_combined = [obj.J; other.J];
                 V_combined = [obj.V; other.V];
-
+                
                 % Combine duplicates: create unique linear indices
                 linInd = sub2ind([obj.M, obj.N], I_combined, J_combined);
                 [uniqueInd, ~, idx] = unique(linInd);
-
+                
                 % Sum duplicate values
                 V_summed = accumarray(idx, V_combined);
-
+                
                 % Recover row and column indices
                 [I_final, J_final] = ind2sub([obj.M, obj.N], uniqueInd);
-
+                
                 % Construct new sparseIJV object
                 result = sparseIJV(I_final, J_final, V_summed, obj.M, obj.N);
             else
                 result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) + other; % will be converted to full
             end
         end
-
+        
         function result = minus(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 result = obj - sparse(other.I, other.J, other.V, other.M, other.N);
@@ -373,29 +408,29 @@ classdef sparseIJV
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
                 end
-
+                
                 % Combine (I, J, V) entries from both objects
                 I_combined = [obj.I; other.I];
                 J_combined = [obj.J; other.J];
                 V_combined = [obj.V; -other.V];
-
+                
                 % Combine duplicates: create unique linear indices
                 linInd = sub2ind([obj.M, obj.N], I_combined, J_combined);
                 [uniqueInd, ~, idx] = unique(linInd);
-
+                
                 % Sum duplicate values
                 V_summed = accumarray(idx, V_combined);
-
+                
                 % Recover row and column indices
                 [I_final, J_final] = ind2sub([obj.M, obj.N], uniqueInd);
-
+                
                 % Construct new sparseIJV object
                 result = sparseIJV(I_final, J_final, V_summed, obj.M, obj.N);
             else
                 result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) - other; % will be converted to full
             end
         end
-
+        
         function result = times(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 result = times(other,obj);
@@ -406,30 +441,30 @@ classdef sparseIJV
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
                 end
-
+                
                 % Find common nonzero (i,j) pairs
                 lin1 = sub2ind([obj.M, obj.N], obj.I, obj.J);
                 lin2 = sub2ind([other.M, other.N], other.I, other.J);
                 [commonInd, ia, ib] = intersect(lin1, lin2);
-
+                
                 if isempty(commonInd)
                     % Return an empty sparseIJV
                     result = sparse([],[],[], obj.M, obj.N);
                     return
                 end
-
+                
                 % Recover (i,j) and compute v = v1 .* v2
                 i = obj.I(ia);
                 j = obj.J(ia);
                 v = obj.V(ia) .* other.V(ib);
-
+                
                 % Form result
                 result = sparse(i, j, v, obj.M, obj.N);
             else
                 result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) * other;
             end
         end
-
+        
         function result = rdivide(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 result = obj ./ sparse(other.I, other.J, other.V, other.M, other.N) ;
@@ -440,7 +475,7 @@ classdef sparseIJV
                 result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) ./ other;
             end
         end
-
+        
         %% Standard linear algebra operations
         function result = mtimes(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
@@ -455,23 +490,23 @@ classdef sparseIJV
                 if obj.N ~= nrows_rhs
                     error('Inner matrix dimensions must agree.');
                 end
-
+                
                 % Initialize result matrix
                 result = zeros(obj.M, ncols_rhs);
-
+                
                 % Accumulate the contributions of each nonzero element
                 for k = 1:length(obj.V)
                     row = obj.I(k);
                     col = obj.J(k);
                     val = obj.V(k);
-
+                    
                     % Multiply the sparse value with corresponding row in "other"
                     % and add to the output
                     result(row, :) = result(row, :) + val * other(col, :);
                 end
             end
         end
-
+        
         function result = mldivide(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 % A \ S, where A is dense and S is sparseIJV
@@ -479,32 +514,32 @@ classdef sparseIJV
                 nonzero_cols = unique(other.J);
                 num_cols = numel(nonzero_cols);
                 num_rows = size(obj, 1);
-
+                
                 % Precompute row and column indices
                 newI = repmat((1:num_rows)', num_cols, 1);
                 newJ = repelem(nonzero_cols(:), num_rows, 1);
-
+                
                 % Accumulate values
                 newV = cell(num_cols,1);
-
+                
                 for k = 1:num_cols
                     col = nonzero_cols(k);
                     mask = (other.J == col);
                     i_col = other.I(mask);
                     v_col = other.V(mask);
-
+                    
                     b = zeros(num_rows, 1);
                     b(i_col) = v_col;
-
+                    
                     newV{k} = obj \ b;
                 end
-
+                
                 result = sparseIJV(newI, newJ, cell2mat(newV), num_rows, other.N);
             else
                 result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) \ other; % shouldn't ever happen, but just for good measure fall back on sparse
             end
         end
-
+        
         function result = mrdivide(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 result = obj / sparse(other.I, other.J, other.V, other.M, other.N); % shouldn't ever happen, but just for good measure fall back on sparse
@@ -517,30 +552,30 @@ classdef sparseIJV
                     nonzero_rows = unique(obj.I);
                     num_rows = numel(nonzero_rows);
                     num_cols = size(other, 2);
-
+                    
                     % Precompute row and column indices
                     newI = repelem(nonzero_rows(:), num_cols, 1);
                     newJ = repmat((1:num_cols)', num_rows, 1);
-
+                    
                     % Accumulate values
                     newV = cell(1,num_rows);
-
+                    
                     for k = 1:num_rows
                         row = nonzero_rows(k);
                         mask = (obj.I == row);
                         j_row = obj.J(mask);
                         v_row = obj.V(mask);
-
+                        
                         b = zeros(1, num_cols);
                         b(j_row) = v_row;
-
+                        
                         newV{k} = b / other;
                     end
-
-                    result = sparseIJV(newI, newJ, cell2mat(newV).', obj.M, num_cols);                
+                    
+                    result = sparseIJV(newI, newJ, cell2mat(newV).', obj.M, num_cols);
                 end
             end
         end
-
+        
     end
 end

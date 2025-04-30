@@ -8,10 +8,11 @@ classdef sparseCSR
     %   sparse column vectors. This means that the storage requirements are
     %   drastically different for short/wide vs tall/skinny arrays. This
     %   can be verified easily:
-    %   >> A=sparse(100,100^3);B=sparse(100^3,100); whos
-    %        Name           Size            Bytes     Class     Attributes
-    %         A         100x1000000        8000024    double      sparse
-    %         B         1000000x100          824      double      sparse
+    %     >> A=sparse(100,100^3);B=sparse(100^3,100);
+    %     >> whos
+    %         Name           Size            Bytes     Class     Attributes
+    %          A         100x1000000        8000024    double      sparse
+    %          B         1000000x100          824      double      sparse
     %   So even though these are both all zero sparse arrays, they have
     %   drastically different storage requirements. In fact, the number of
     %   rows has no impact on the storage, it is primarily the number of
@@ -24,6 +25,42 @@ classdef sparseCSR
     %   tall/skinny array, but externally have something that looks and
     %   quacks like a short/wide array. This is primarily done by
     %   overloading key methods.
+    %
+    %   This class is closely related to the sparseIJV class, which takes a
+    %   different approach and stores the row indices, column indices, and
+    %   values rather than forming a sparse array at all. sparseIJV is
+    %   based on this from the sparse() documentation:
+    %
+    %        "This dissects and then reassembles a sparse matrix:
+    %               [I,J,V] = find(S);
+    %               [M,N] = size(S);
+    %               S = sparse(I,J,V,M,N);"
+    %
+    %   These three approaches can be compared on the finite element example
+    %   example in getSystem29 in the PPR repository. See sparseIJV for more
+    %   background. The quadratic coefficient is all zeros, and in that case 
+    %   sparseIJV is best:
+    %     >> n=4225; S0=sparse(n,n^2); S1=sparseCSR(n,n^2); S2=sparseIJV(n,n^2);
+    %     >> whos S0 S1 S2
+    %         Name           Size            Bytes     Class     Attributes
+    %          S0       4225x17850625     142805024    double      sparse
+    %          S1       4225x17850625         33824   sparseCSR    sparse
+    %          S2       4225x17850625            16   sparseIJV    sparse
+    %   The cubic coefficient is not all zeros:
+    %     >> S1 = sparseCSR(I, J, V, n, n^3); S2 = sparseIJV(I, J, V, n, n^3);
+    %     >> whos S1 S2
+    %         Name          Size             Bytes     Class     Attributes
+    %          S0           fails            > 4e12    double      sparse
+    %          S1      4225x75418890625     4566048   sparseCSR    sparse
+    %          S2      4225x75418890625    22020128   sparseIJV    sparse
+    %   It may appear that sparseCSR is actually best here, and depending
+    %   on the usage of the array it may be. However, in the case of
+    %   runExample29 and PPR, the way that these arrays are used is based
+    %   on calling find() to get the nonzero entries, so sparseIJV may
+    %   actually be better because it basically stores that directly.
+    %   Furthermore, since sparseCSR is still based on sparse(), it does
+    %   hit a wall due to Matlab's maximum array size of 2^48 - 1. So for
+    %   larger models, sparseIJV is the only option.
     %
     %   Here is a list of the overloaded methods:
     %       Constructor:
@@ -43,8 +80,8 @@ classdef sparseCSR
     %           plus, minus, mtimes, mldivide, mrdivide
     %
     %   Here is a list of the properties that this class can have:
-    %           StoredTransposed - transposed array that is stored as a
-    %                              standard sparse array
+    %        StoredTransposed - transposed array that is stored as a
+    %                           standard sparse array
     %
     %   Part of the KroneckerTools repository.
     %%
@@ -181,7 +218,7 @@ classdef sparseCSR
                     elseif numel(S(1).subs) == 2
                         % 2D index: obj(i, j)
                         [i,j] = deal(S(1).subs{:});
-                        varargout{1} = obj.StoredTransposed(j,i);
+                        varargout{1} = obj.StoredTransposed(j,i).';
                     else
                         error('Unsupported indexing type.')
                     end
@@ -285,7 +322,7 @@ classdef sparseCSR
         
         function result = mrdivide(obj, other)
             if ~isa(obj,'sparseCSR') && isa(other,'sparseCSR')
-                    result = obj / other.StoredTransposed.';
+                result = obj / other.StoredTransposed.';
             else
                 if isscalar(other)
                     result = sparseCSR(obj.StoredTransposed.' / other);
