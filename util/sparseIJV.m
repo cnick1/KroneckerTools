@@ -94,10 +94,11 @@ classdef sparseIJV
     %               but stores the transpose of the array.
     %           S = sparseIJV(M) converts a matrix M to a sparseIJV matrix
     %           For all other cases, we fall back on calling sparseCSR().
+    %           Note: M = sparse(S) converts a sparseIJV to a normal sparse
     %       Basic manipulation/indexing:
     %           size, length, find, norm, disp, transpose
     %       Sparse characteristics:
-    %           full, spy, nnz, issparse
+    %           sparse, full, spy, nnz, issparse
     %       Scalar algebra:
     %           plus, minus, times, rdivide
     %       Matrix algebra:
@@ -308,8 +309,12 @@ classdef sparseIJV
             if obj.N > obj.M
                 B = full(sparseCSR(obj.I, obj.J, obj.V, obj.M, obj.N));
             else
-                B = full(sparse(obj.I, obj.J, obj.V, obj.M, obj.N));
+                B = full(sparse(obj));
             end
+        end
+        
+        function S = sparse(obj)
+            S = sparse(obj.I, obj.J, obj.V, obj.M, obj.N);
         end
         
         function varargout = find(obj, varargin)
@@ -441,13 +446,13 @@ classdef sparseIJV
                 % Construct new sparseIJV object
                 result = sparseIJV(I_final, J_final, V_summed, obj.M, obj.N);
             else
-                result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) + other; % will be converted to full
+                result = sparse(obj) + other; % will be converted to full
             end
         end
         
         function result = minus(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
-                result = obj - sparse(other.I, other.J, other.V, other.M, other.N);
+                result = obj - sparse(other);
                 return
             end
             if isa(other,'sparseIJV')
@@ -473,7 +478,7 @@ classdef sparseIJV
                 % Construct new sparseIJV object
                 result = sparseIJV(I_final, J_final, V_summed, obj.M, obj.N);
             else
-                result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) - other; % will be converted to full
+                result = sparse(obj) - other; % will be converted to full
             end
         end
         
@@ -507,49 +512,106 @@ classdef sparseIJV
                 % Form result
                 result = sparse(i, j, v, obj.M, obj.N);
             else
-                result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) * other;
+                result = sparse(obj) * other;
             end
         end
         
         function result = rdivide(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
-                result = obj ./ sparse(other.I, other.J, other.V, other.M, other.N) ;
+                result = obj ./ sparse(other) ;
             elseif isa(obj,'sparseIJV') && isscalar(other)
                 result = obj;
                 result.V = result.V ./ other;
             else
-                result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) ./ other;
+                result = sparse(obj) ./ other;
             end
         end
         
         %% Standard linear algebra operations
-        function result = mtimes(obj, other)
-            if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
-                result = mtimes(other.', obj.').';
+        function result = mtimes(A, B)
+            if (isa(A,'sparseIJV') && ~nnz(A)) || (isa(B,'sparseIJV') && ~nnz(B))
+                m = size(A, 1);
+                n = size(B, 2);
+                result = sparseIJV(m,n);
                 return
             end
-            if isscalar(other)
-                result = times(obj, other);
-            else % matrix-matrix case
-                % Check dimensions
-                [nrows_rhs, ncols_rhs] = size(other);
-                if obj.N ~= nrows_rhs
-                    error('Inner matrix dimensions must agree.');
-                end
+            if ~isa(A,'sparseIJV') && isa(B,'sparseIJV')
+                % This is based on the columns of AB being linear combinations of the columns of A weighted by the entries in the columns of B
+                % Sort B by J (column index) for fast grouping
+                [sorted_J, sort_idx] = sort(B.J);
+                sorted_I = B.I(sort_idx);
+                sorted_V = B.V(sort_idx);
                 
-                % Initialize result matrix
-                result = zeros(obj.M, ncols_rhs);
+                % Find the split points between columns
+                [unique_cols, first_idx, ~] = unique(sorted_J, 'first');
+                last_idx = [first_idx(2:end)-1; numel(sorted_J)];
                 
-                % Accumulate the contributions of each nonzero element
-                for k = 1:length(obj.V)
-                    row = obj.I(k);
-                    col = obj.J(k);
-                    val = obj.V(k);
+                % Preallocate lists for results
+                res_I = cell(numel(unique_cols), 1);
+                res_J = cell(numel(unique_cols), 1);
+                res_V = cell(numel(unique_cols), 1);
+                
+                % Loop over each unique column of 'B'
+                for k = 1:numel(unique_cols)
+                    c = unique_cols(k);
+                    idx_range = first_idx(k):last_idx(k);
                     
-                    % Multiply the sparse value with corresponding row in "other"
-                    % and add to the output
-                    result(row, :) = result(row, :) + val * other(col, :);
+                    rows_in_col = sorted_I(idx_range);
+                    vals_in_col = sorted_V(idx_range);
+                    
+                    % Compute the c-th column of the result
+                    col_vec = A(:, rows_in_col) * vals_in_col;
+                    
+                    % Find nonzeros in the resulting column
+                    nz_rows = find(col_vec);
+                    nz_vals = col_vec(nz_rows);
+                    
+                    % Store the nonzero entries
+                    res_I{k} = nz_rows(:);
+                    res_J{k} = repmat(c, numel(nz_rows), 1);
+                    res_V{k} = nz_vals(:);
                 end
+                
+                % Create output sparseIJV object
+                result = sparseIJV(vertcat(res_I{:}), vertcat(res_J{:}), vertcat(res_V{:}), size(A, 1), B.N);
+                
+            elseif isscalar(A) || isscalar(B)
+                result = times(A, B);
+            else % A*B where A is sparseIJV and B is something else
+                % ABij = A(i,:)*B(:,j)
+                
+                % Get unique nonzero rows of A
+                rows = unique(A.I).';
+                
+                % Preallocate lists to collect result entries
+                max_nz_rows = length(rows);
+                res_I = cell(max_nz_rows, 1);
+                res_J = cell(max_nz_rows, 1);
+                res_V = cell(max_nz_rows, 1);
+                
+                k = 0;
+                for r = rows % Loop over each nonzero row
+                    % Construct rth row of A as a Matlab sparse
+                    % Find indices for row r in A
+                    idx = find(A.I == r);
+                    row_vec = sparse(1, A.J(idx), A.V(idx), 1, A.N);
+                    
+                    % Multiply with B (1 x N) * (N x P) = (1 x P)
+                    prod_row = row_vec * B;
+                    
+                    % Find nonzeros in the resulting row
+                    nz_cols = find(prod_row);
+                    nz_vals = prod_row(nz_cols);
+                    
+                    % Append to result
+                    k = k + 1;
+                    res_I{k} = repmat(r, numel(nz_cols), 1);
+                    res_J{k} = nz_cols(:);
+                    res_V{k} = nz_vals(:);
+                end
+                
+                % Create output sparseIJV object
+                result = sparseIJV(vertcat(res_I{:}), vertcat(res_J{:}), vertcat(res_V{:}), A.M, size(B, 2));
             end
         end
         
@@ -582,16 +644,16 @@ classdef sparseIJV
                 
                 result = sparseIJV(newI, newJ, cell2mat(newV), num_rows, other.N);
             else
-                result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) \ other; % shouldn't ever happen, but just for good measure fall back on sparse
+                result = sparse(obj) \ other; % shouldn't ever happen, but just for good measure fall back on sparse
             end
         end
         
         function result = mrdivide(obj, other)
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
-                result = obj / sparse(other.I, other.J, other.V, other.M, other.N); % shouldn't ever happen, but just for good measure fall back on sparse
+                result = obj / sparse(other); % shouldn't ever happen, but just for good measure fall back on sparse
             else
                 if isscalar(other)
-                    result = sparse(obj.I, obj.J, obj.V, obj.M, obj.N) ./ other;
+                    result = sparse(obj) ./ other;
                 else
                     % S / A, where A is dense and S is sparseIJV
                     % Identify nonzero columns of S

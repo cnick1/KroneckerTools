@@ -36,12 +36,10 @@ function [FofX] = kronPolyEval(f,x,d,sprse)
 %         coefficients and the reduction basis T.
 %       - Sparse coefficients can be handled; here we have a general-purpose
 %         implementation, but in cases where performance is critical and
-%         repeated evaluation of the SAME polynomial are performed,
-%         additional special case speed-ups can be made that give MAJOR
-%         improvements. If performance is critical, my current approach is 
-%         to make a local function sparseKronPolyEval() to keep the code 
-%         simple and make any other speedups I can. See runExample29() in 
-%         the PPR repository for an example. 
+%         repeated evaluation of the SAME polynomial are performed, additional
+%         special case speed-ups can be made See runExample29() in the PPR
+%         repository for an example. For best performance in very large models,
+%         consider using the sparseIJV (preferred) or sparseCSR classes.
 %
 %   Author: Rewritten by Nick Corbin, UCSD
 %           Based on original version by Jeff Borggaard, Virginia Tech
@@ -99,13 +97,9 @@ elseif isa(f,'factoredValueArray')
 elseif sprse && issparse(f{end})
     %% Evaluate sparse Kronecker polynomial
     % Note: in the case of REPEATED evaluation of THE SAME sparse
-    % Kronecker polynomial, a MAJOR improvement can be obtained by using
-    % persistent variables to find and store the sparsity pattern of the
-    % coefficients. If performance is that critical,  my current approach is 
-    % making a local function sparseKronPolyEval() to keep the code simple
-    % and make any other speedups I can. See runExample29() in the PPR
-    % repository for an example. This is just a general case without all of
-    % the possible special cases speed-ups that are possible.
+    % Kronecker polynomial, consider using sparseIJV class or making a
+    % local sparseKronPolyEval() with additional improvements, such as
+    % persistent variables.
     n = length(x);
     
     % Assume transposition not needed, and assume linear term not empty
@@ -113,17 +107,17 @@ elseif sprse && issparse(f{end})
     
     % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
     for k=2:d
-        [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars
-        inds = cell(1, k); % Preallocate cell array for k indices
-        [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
-        
-        % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
-        xprod = ones(size(Fj));
-        for p = 1:k
-            xprod = xprod .* x(inds{p});
+        [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars (using sparseIJV helps)
+        if ~isempty(Fi) % skip all zero coefficients
+            inds = cell(1, k); % Preallocate cell array for k indices
+            [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
+            
+            % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
+            % Evaluate x at each index and take product along rows
+            xprod = prod(x(cell2mat(inds)), 2);
+            
+            FofX = FofX + accumarray(Fi, Fv .* xprod, size(x));
         end
-        
-        FofX = FofX + accumarray(Fi, Fv .* xprod, size(x));
     end
 else
     %% Evaluate standard Kronecker polynomial
