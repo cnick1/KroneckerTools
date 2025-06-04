@@ -1,5 +1,5 @@
 classdef factoredMatrixInverse
-    %FACTOREDMATRIXINVERSE An n x n matrix M stored in terms of its inverse square-root factors M = Z*Zᵀ = (Z⁻¹*Z⁻ᵀ)⁻¹.
+    %FACTOREDMATRIXINVERSE An n x n matrix M stored in terms of its inverse square-root factors M = Z*Zᵀ = (Z⁻ᵀ*Z⁻¹)⁻¹.
     %   See the documentation for factoredMatrix first. That class is set
     %   up inspired by the observability energy, which for a linear system
     %   is given by the observability Gramian. The Gramian can be computed
@@ -12,9 +12,9 @@ classdef factoredMatrixInverse
     %       Lᶜ(x) = ½ ( xᵀ P⁻¹ x + v₃ᵀ(x⊗x⊗x) + ... + vᵈᵀ(...⊗x) )
     %   The Gramian can be computed in terms of its Cholesky factor by
     %   lyapchol(), which gives
-    %       V₂ = "P⁻¹" = (R⁻¹*R⁻ᵀ)⁻¹ = R*Rᵀ
+    %       V₂ = "P⁻¹" = (R⁻ᵀ*R⁻¹)⁻¹ = R*Rᵀ
     %   In the end, what we actually need are not L and R, but L and R⁻¹.
-    %   So instead of inverting twice, which is illconditioned², we can
+    %   So instead of inverting twice, which is doubly illconditioned, we can
     %   just deal directly with "R⁻¹", which is what lyapchol() gives as
     %   the square-root of the controllability Gramian.
     
@@ -32,8 +32,9 @@ classdef factoredMatrixInverse
     %   having to repeatedly solve linear systems and instead just did it once
     %   (n solves) to get V₂ = P⁻¹ and then use matrix multiplication. To use the
     %   square-root factors instead, we have to do something like
-    %       V₂*B = (R⁻¹*R⁻ᵀ)⁻¹ * B
-    %            = (R⁻¹*R⁻ᵀ) \ B
+    %       V₂*B = (R⁻ᵀ*R⁻¹)⁻¹ * B
+    %            = (R*Rᵀ)*B
+    %            = R*(Rᵀ*B)
     %            = R⁻¹\(R⁻ᵀ\B)
     %            = Rinv\(Rinv.'\B)
     %   which requires TWO linear solves every time we try to multiply V₂. Both
@@ -50,7 +51,7 @@ classdef factoredMatrixInverse
     %   1). The overloaded cholinv() instead, which returns Zinv, is especially
     %   important for Task 2).
     %
-    %   From here on, I'll revert to the notation M = (Z⁻¹*Z⁻ᵀ)⁻¹ to be
+    %   From here on, I'll revert to the notation M = (Z⁻ᵀ*Z⁻¹)⁻¹ to be
     %   consistent with the general class as in factoredMatrix. This class is
     %   designed to facilitate handling the matrix M, but by storing only its
     %   inverse square-root factor Z⁻¹ and never actually performing any
@@ -89,30 +90,30 @@ classdef factoredMatrixInverse
                 error("factoredMatrixInverse: mtimes not currently implemented when both are factoredMatrixInverse")
             elseif isa(other, 'factoredMatrixInverse')
                 % A*B where B is a factoredMatrixInverse
-                %   A*B = A*(Z⁻¹*Z⁻ᵀ)⁻¹
-                %       = A*(Zᵀ*Z)
-                %       = (A*Zᵀ)*Z
-                %       = (A/Z⁻ᵀ)/Z⁻¹
-                %       = (A/Zinv.')/Zinv
-                result = (obj / other.Zinv.') / other.Zinv;
+                %   A*B = A*(Z⁻ᵀ*Z⁻¹)⁻¹
+                %       = A*(Z*Zᵀ)
+                %       = (A*Z)*Zᵀ
+                %       = (A/Z⁻¹)/Z⁻ᵀ
+                %       = (A/Zinv)/Zinv.'
+                result = (obj / other.Zinv) / other.Zinv.';
             else
                 % A*B where A is a factoredMatrixInverse
-                %   A*B = (Z⁻¹*Z⁻ᵀ)⁻¹ * B
-                %       = (Zᵀ*Z)*B
-                %       = Zᵀ*(Z*B)
-                %       = Z⁻ᵀ\(Z⁻¹\B)
-                %       = Zinv.'\(Zinv\B)
-                result = obj.Zinv.' \ (obj.Zinv \ other);
+                %   A*B = (Z⁻ᵀ*Z⁻¹)⁻¹ * B
+                %       = (Z*Zᵀ)*B
+                %       = Z*(Zᵀ*B)
+                %       = Z⁻¹\(Z⁻ᵀ\B)
+                %       = Zinv\(Zinv.'\B)
+                result = obj.Zinv \ (obj.Zinv.' \ other);
             end
         end
         
         function result = full(obj)
             % Don't recommend ever calling this
-            result = inv(obj.Zinv * obj.Zinv.');
+            result = inv(obj.Zinv.' * obj.Zinv);
         end
         
         function result = inv(obj)
-            result = obj.Zinv * obj.Zinv.';
+            result = obj.Zinv.' * obj.Zinv;
         end
         
         function disp(obj, dispFull)

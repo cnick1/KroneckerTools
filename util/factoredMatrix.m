@@ -26,10 +26,12 @@ classdef factoredMatrix
     %       - disp: display the matrix or its square-root factor
     %       - chol: returns the square root factor Z
     %       - vec: fake overload of vectorize
+    %       - numel: return n^2, number of elements in M (equivalent to length(vec(M)))
     %       - length: return n, the height of Z
     %       - size: M = Z*Zᵀ, so M is square n x n where n is height of Z
     %       - reshape: fake overload, only works for n x n and will just return M
     %       - transpose: M is symmetric, so just returns M
+    %       - norm: will call norm(full(M))
     properties
         Z
     end
@@ -43,10 +45,10 @@ classdef factoredMatrix
             if isa(obj, 'factoredMatrix') && isa(other, 'factoredMatrix')
                 % Both are factoredMatrix; not planning on using this
                 result = obj.Z * (obj.Z.' * other.Z) * other.Z.';
-            elseif isa(other, 'factoredMatrix') 
+            elseif isa(other, 'factoredMatrix')
                 % A*B where B is a factoredMatrix
                 result = (obj * other.Z) * other.Z.';
-            else 
+            else
                 % A*B where A is a factoredMatrix
                 result = obj.Z * (obj.Z.' * other);
             end
@@ -95,13 +97,21 @@ classdef factoredMatrix
             result = obj;
         end
         
+        function result = numel(obj)
+            result = length(obj)^2;
+        end
+        
         function result = length(obj)
             result = size(obj.Z, 1);
         end
         
-        function result = size(obj)
+        function result = size(obj,varargin)
             n = length(obj);
-            result = [n, n];
+            if nargin < 1 || isempty(varargin)
+                result = [n, n];
+            else
+                result = n;
+            end
         end
         
         function result = reshape(obj, dim1, dim2)
@@ -116,6 +126,48 @@ classdef factoredMatrix
         function result = transpose(obj)
             % Assuming obj is symmetric
             result = obj;
+        end
+        
+        function result = norm(obj, norm_type)
+            % All of these are going to require evaluating full(obj)
+            if nargin < 2
+                norm_type = 'inf';
+                fprintf('  (factoredMatrix: defaulting to inf norm)\n')
+            end
+            
+            result = norm(full(obj), norm_type);
+        end
+        
+        %% Standard algebraic operations
+        % All of these are going to require evaluating full(obj)
+        function result = plus(obj, other)
+            if isa(obj, 'factoredMatrix')
+                obj = full(obj);
+                obj = reshape(obj,size(other));
+            end
+            if isa(other, 'factoredMatrix')
+                other = full(other);
+                other = reshape(other,size(obj));
+            end
+            result = obj + other;
+        end
+        
+        function result = minus(obj, other)
+            if isa(obj, 'factoredMatrix')
+                obj = full(obj);
+                obj = reshape(obj,size(other));
+            end
+            if isa(other, 'factoredMatrix')
+                other = full(other);
+                other = reshape(other,size(obj));
+            end
+            result = obj - other;
+        end
+        
+        %% Other
+        function result = sym(obj)
+            % Assuming obj is symmetric
+            result = sym(full(obj));
         end
     end
     
