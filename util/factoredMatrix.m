@@ -40,11 +40,14 @@ classdef factoredMatrix
         end
         
         function result = mtimes(obj, other)
-            if ~isa(obj, 'factoredMatrix') && isa(other, 'factoredMatrix')
-                result = (obj * other.Z) * other.Z.'
-            elseif isa(other, 'factoredMatrix')
+            if isa(obj, 'factoredMatrix') && isa(other, 'factoredMatrix')
+                % Both are factoredMatrix; not planning on using this
                 result = obj.Z * (obj.Z.' * other.Z) * other.Z.';
-            else
+            elseif isa(other, 'factoredMatrix') 
+                % A*B where B is a factoredMatrix
+                result = (obj * other.Z) * other.Z.';
+            else 
+                % A*B where A is a factoredMatrix
                 result = obj.Z * (obj.Z.' * other);
             end
         end
@@ -59,7 +62,7 @@ classdef factoredMatrix
             end
             
             if dispFull
-                disp(obj.Z * obj.Z.')
+                disp(full(obj))
             else
                 builtin('disp', obj);
                 fprintf("    Call disp(M,true) to display the full M matrix.\n\n")
@@ -67,7 +70,7 @@ classdef factoredMatrix
         end
         
         function result = chol(obj, triangle)
-            if nargin < 2
+            if nargin < 2 % Note: my default is lower, but standard chol defaults to upper
                 triangle = 'lower';
             end
             
@@ -82,12 +85,18 @@ classdef factoredMatrix
         
         function result = vec(obj)
             % This is a fake overload; the result is not vec(obj) it is just obj.
-            % In the PPR code, we use v2 = vec(V2); however, later on, it is (should) always be reshaped again as V2. In general, in Kronecker product computations, we should NEVER use the vector, it should always end up reshaped as the matrix. So, just to have the code easier to read so that we don't have to always have an exception for v2, we will just fake it and then have the reshaping operation handle it later.
+            % In the PPR code, we use v2 = vec(V2); however, later on, it
+            % is (should) always be reshaped again as V2. In general, in
+            % Kronecker product computations, we should NEVER use the
+            % vector, it should always end up reshaped as the matrix. So,
+            % just to have the code easier to read so that we don't have to
+            % always have an exception for v2, we will just fake it and
+            % then have the reshaping operation handle it later.
             result = obj;
         end
         
         function result = length(obj)
-            result = size(obj.Z, 1)
+            result = size(obj.Z, 1);
         end
         
         function result = size(obj)
