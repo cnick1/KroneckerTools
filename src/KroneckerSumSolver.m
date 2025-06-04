@@ -68,8 +68,8 @@ function [x] = KroneckerSumSolver(A,b,k,E,M,solver)
 vec = @(x) x(:);
 
 if nargin < 6 || isempty(solver)
-    % solver = 'chen-kressner';
-    solver = 'bartels-stewart';
+    solver = 'chen-kressner';
+    % solver = 'bartels-stewart';
     % solver = 'bartels-stewart-jeffs';
     % solver = 'generalized-bartels-stewart';
     if nargin < 4

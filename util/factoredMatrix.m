@@ -18,13 +18,18 @@ classdef factoredMatrix
     %   matrix M. This is primarily done by overloading key methods so that the
     %   user doesn't have to worry about these details.
     %
-    %   This class also overloads the following methods so that a factoredMatrix
+    %   This class overloads the following methods so that a factoredMatrix
     %   behaves similarly to a regular matrix:
-    %       - size: M = Z*Zᵀ, so M is square n x n where n is height of Z
+    %       - factoredMatrix: constructor, just pass in Z
     %       - mtimes: performs matrix-matrix multiplication as M*B = Z*(Z.'*B)
-    %       - full: evaluate and return the full matrix
+    %       - full: evaluate and return the full matrix (generally not recommended)
     %       - disp: display the matrix or its square-root factor
     %       - chol: returns the square root factor Z
+    %       - vec: fake overload of vectorize
+    %       - length: return n, the height of Z
+    %       - size: M = Z*Zᵀ, so M is square n x n where n is height of Z
+    %       - reshape: fake overload, only works for n x n and will just return M
+    %       - transpose: M is symmetric, so just returns M
     properties
         Z
     end
@@ -97,6 +102,12 @@ classdef factoredMatrix
             else
                 error("factoredMatrix: M should be a square matrix")
             end
-            
+        end
+        
+        function result = transpose(obj)
+            % Assuming obj is symmetric
+            result = obj;
         end
     end
+    
+end

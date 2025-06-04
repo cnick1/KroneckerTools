@@ -41,6 +41,11 @@ function [FofX] = kronPolyEval(f,x,d,sprse)
 %         repository for an example. For best performance in very large models,
 %         consider using the sparseIJV (preferred) or sparseCSR classes.
 %
+%   Idea: what if we overwrite f in place and basically go through each f
+%   and reshape as an __ x n matrix, multiply by x, do that in a triangular
+%   fashion, and then add the results together... should be much more
+%   efficient than ever using kron() for anything...
+%
 %   Author: Rewritten by Nick Corbin, UCSD
 %           Based on original version by Jeff Borggaard, Virginia Tech
 %

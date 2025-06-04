@@ -139,7 +139,7 @@ classdef sparseIJV
                 obj.M = varargin{1};
                 obj.N = varargin{2};
                 obj.I = []; obj.J = []; obj.V = []; % all zeros sparse array is empty
-            elseif nargin >= 5 && isnumeric(varargin{1}) && isnumeric(varargin{2}) && isnumeric(varargin{3})
+            elseif nargin >= 5 && isnumeric(varargin{1}) && isnumeric(varargin{2}) && (isnumeric(varargin{3}) || islogical(varargin{3}))
                 % Called like sparse(i,j,s,m,n)
                 obj.I = varargin{1};
                 obj.J = varargin{2};
@@ -236,10 +236,15 @@ classdef sparseIJV
             switch S(1).type
                 case '()'
                     if numel(S(1).subs) ~= 2
-                        error('sparseIJV: only 2D indexing assignment is currently supported');
+                        warning('sparseIJV: only 2D indexing assignment is currently supported; converting to 2D indexing');
+                        if iscell(S(1).subs) 
+                            S(1).subs = S(1).subs{1};
+                        end
+                        [i, j] = ind2sub([obj.M, obj.N], S(1).subs);
+                    else
+                        i = S(1).subs{1};
+                        j = S(1).subs{2};
                     end
-                    i = S(1).subs{1};
-                    j = S(1).subs{2};
                     
                     if ischar(i) && strcmp(i, ':'); i = 1:obj.M; end
                     if ischar(j) && strcmp(j, ':'); j = 1:obj.N; end
@@ -335,6 +340,25 @@ classdef sparseIJV
                     error('Too many output arguments.');
             end
         end
+
+        function result = abs(obj)
+            result = sparseIJV(obj.J, obj.I, abs(obj.V), obj.N, obj.M);
+        end
+
+        % function result = gt(obj, value) % S > value
+        %     result = sparseIJV(obj.J, obj.I, gt(obj.V, value), obj.N, obj.M);
+        % end
+        % 
+        % function result = lt(obj, value) % S < value
+        %     result = sparseIJV(obj.J, obj.I, lt(obj.V, value), obj.N, obj.M);
+        % end
+        % 
+        % function result = ge(obj, value) % S >= value
+        %     result = sparseIJV(obj.J, obj.I, ge(obj.V, value), obj.N, obj.M);
+        % end
+        % function result = le(obj, value) % S <= value
+        %     result = sparseIJV(obj.J, obj.I, le(obj.V, value), obj.N, obj.M);
+        % end
         
         function result = norm(obj, norm_type)
             if nargin < 2
