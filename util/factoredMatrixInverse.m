@@ -59,19 +59,21 @@ classdef factoredMatrixInverse
     %   primarily done by overloading key methods so that the user doesn't have
     %   to worry about these details.
     %
-    %   This class overloads the following methods so that a factoredMatrix
+    %   This class overloads the following methods so that a factoredMatrixInverse
     %   behaves similarly to a regular matrix:
-    %       - factoredMatrix: constructor, just pass in Zinv
+    %       - factoredMatrixInverse: constructor, just pass in Zinv
     %       - mtimes: perform matrix multiplication by appropriate mldivide operations
     %       - full: evaluate and return the full matrix (generally not recommended)
     %       - inv: return M⁻¹ = (Z⁻¹*Z⁻ᵀ) (would correspond to full Gramian P)
     %       - disp: display the matrix or its square-root factor
     %       - cholinv: returns the inverse square-root factor Zinv
     %       - vec: fake overload of vectorize
+    %       - numel: return n^2, number of elements in M (equivalent to length(vec(M)))
     %       - length: return n, the height of Zinv
     %       - size: M is square n x n where n is height of Zinv
     %       - reshape: fake overload, only works for n x n and will just return M
     %       - transpose: M is symmetric, so just returns M
+    %       - norm: will call norm(full(M))
     properties
         Zinv
     end
@@ -88,17 +90,19 @@ classdef factoredMatrixInverse
             elseif isa(other, 'factoredMatrixInverse')
                 % A*B where B is a factoredMatrixInverse
                 %   A*B = A*(Z⁻¹*Z⁻ᵀ)⁻¹
-                %       = A/(Z⁻¹*Z⁻ᵀ)
-                %       = (A/Z⁻¹)/Z⁻ᵀ
-                %       = (A/Zinv)/Zinv.'
-                result = (obj / other.Zinv) / other.Zinv.';
+                %       = A*(Zᵀ*Z)
+                %       = (A*Zᵀ)*Z
+                %       = (A/Z⁻ᵀ)/Z⁻¹
+                %       = (A/Zinv.')/Zinv
+                result = (obj / other.Zinv.') / other.Zinv;
             else
                 % A*B where A is a factoredMatrixInverse
                 %   A*B = (Z⁻¹*Z⁻ᵀ)⁻¹ * B
-                %       = (Z⁻¹*Z⁻ᵀ)\B
-                %       = Z⁻¹\(Z⁻ᵀ\B)
-                %       = Zinv\(Zinv.'\B)
-                result = obj.Zinv \ (obj.Zinv.' \ other);
+                %       = (Zᵀ*Z)*B
+                %       = Zᵀ*(Z*B)
+                %       = Z⁻ᵀ\(Z⁻¹\B)
+                %       = Zinv.'\(Zinv\B)
+                result = obj.Zinv.' \ (obj.Zinv \ other);
             end
         end
         
@@ -141,13 +145,21 @@ classdef factoredMatrixInverse
             result = obj;
         end
         
+        function result = numel(obj)
+            result = length(obj)^2;
+        end
+        
         function result = length(obj)
             result = size(obj.Zinv, 1);
         end
         
-        function result = size(obj)
+        function result = size(obj,varargin)
             n = length(obj);
-            result = [n, n];
+            if nargin < 1 || isempty(varargin)
+                result = [n, n];
+            else
+                result = n;
+            end
         end
         
         function result = reshape(obj, dim1, dim2)
@@ -162,6 +174,48 @@ classdef factoredMatrixInverse
         function result = transpose(obj)
             % Assuming obj is symmetric
             result = obj;
+        end
+        
+        function result = norm(obj, norm_type)
+            % All of these are going to require evaluating full(obj)
+            if nargin < 2
+                norm_type = 'inf';
+                fprintf('  (factoredMatrixInverse: defaulting to inf norm)\n')
+            end
+            
+            result = norm(full(obj), norm_type);
+        end
+        
+        %% Standard algebraic operations
+        % All of these are going to require evaluating full(obj)
+        function result = plus(obj, other)
+            if isa(obj, 'factoredMatrixInverse')
+                obj = full(obj);
+                obj = reshape(obj,size(other));
+            end
+            if isa(other, 'factoredMatrixInverse')
+                other = full(other);
+                other = reshape(other,size(obj));
+            end
+            result = obj + other;
+        end
+        
+        function result = minus(obj, other)
+            if isa(obj, 'factoredMatrixInverse')
+                obj = full(obj);
+                obj = reshape(obj,size(other));
+            end
+            if isa(other, 'factoredMatrixInverse')
+                other = full(other);
+                other = reshape(other,size(obj));
+            end
+            result = obj - other;
+        end
+        
+        %% Other
+        function result = sym(obj)
+            % Assuming obj is symmetric
+            result = sym(full(obj));
         end
     end
     
