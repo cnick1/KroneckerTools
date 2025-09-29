@@ -64,7 +64,7 @@ function LkMv = LyapProduct(M,v,k,E)
 vec = @(X) X(:);
 [m,n] = size(M);
 
-if ( size(v,1) ~= n^k ); error('The dimensions of v do not match the degree of the k-way Lyapunov matrix'); end % Right now, we are assuming v is a single column
+if ( numel(v) ~= n^k ); error('The dimensions of v do not match the degree of the k-way Lyapunov matrix'); end % Right now, we are assuming v is a single column
 if ( k<2 ); error('k must be >= 2'); end
 
 if nargin < 4 || isempty(E) % no mass matrix E

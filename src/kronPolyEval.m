@@ -147,15 +147,31 @@ else
     %% Perform polynomial evaluation
     % Evaluate linear term; handle special case if the linear term is an empty cell
     if isempty(f{1})
-        n = size(f{2},1);
+        n = size(f{2},1); 
+        if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
+            n = 1;
+        end
         FofX = zeros(n,1);
     else
         FofX = f{1}*x;
     end
+
+    if d == 1
+        return;
+    end
     
     % Evaluate higher-degree terms successively
-    xk = x;
-    for k=2:d
+    xk = x; 
+    
+    % k=2 case
+    xk = kron(xk,x); % just to keep track
+    if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
+        FofX  = FofX + x.'*f{2}*x;
+    else
+        FofX  = FofX + f{2}*xk;
+    end
+
+    for k=3:d
         xk = kron(xk,x);
         FofX  = FofX + f{k}*xk;
     end
