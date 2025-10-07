@@ -139,6 +139,25 @@ classdef sparseIJV
                 obj.M = varargin{1};
                 obj.N = varargin{2};
                 obj.I = []; obj.J = []; obj.V = []; % all zeros sparse array is empty
+            elseif nargin == 3 && isnumeric(varargin{1}) && isnumeric(varargin{2})
+                % Called like sparse(i,j,s)
+                if isscalar(varargin{3}) && varargin{3} == 0
+                    obj = sparseIJV(max(varargin{1}), max(varargin{2}));
+                else
+                    obj.I = varargin{1};
+                    if isscalar(varargin{2})
+                        obj.J =  varargin{2} * ones(length(obj.I),1);
+                    else
+                        obj.J = varargin{2};
+                    end
+                    if isscalar(varargin{3})
+                        obj.V = varargin{3} * ones(length(obj.I),1);
+                    else
+                        obj.V = varargin{3};
+                    end
+                    obj.M = max(obj.I);
+                    obj.N = max(obj.J);
+                end
             elseif nargin >= 5 && isnumeric(varargin{1}) && isnumeric(varargin{2}) && (isnumeric(varargin{3}) || islogical(varargin{3}))
                 % Called like sparse(i,j,s,m,n)
                 obj.I = varargin{1};
@@ -510,8 +529,12 @@ classdef sparseIJV
             if ~isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 result = times(other,obj);
             elseif isa(obj,'sparseIJV') && isscalar(other)
-                result = obj;
-                result.V = result.V .* other;
+                if other == 0
+                    result = sparseIJV(obj.M,obj.N);
+                else
+                    result = obj;
+                    result.V = result.V .* other;
+                end
             elseif isa(obj,'sparseIJV') && isa(other,'sparseIJV')
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
@@ -559,7 +582,10 @@ classdef sparseIJV
                 result = sparseIJV(m,n);
                 return
             end
-            if ~isa(A,'sparseIJV') && isa(B,'sparseIJV')
+
+            if isscalar(A) || isscalar(B)
+                result = times(A, B);
+            elseif ~isa(A,'sparseIJV') && isa(B,'sparseIJV')
                 % This is based on the columns of AB being linear combinations of the columns of A weighted by the entries in the columns of B
                 % Sort B by J (column index) for fast grouping
                 [sorted_J, sort_idx] = sort(B.J);
@@ -599,8 +625,6 @@ classdef sparseIJV
                 % Create output sparseIJV object
                 result = sparseIJV(vertcat(res_I{:}), vertcat(res_J{:}), vertcat(res_V{:}), size(A, 1), B.N);
                 
-            elseif isscalar(A) || isscalar(B)
-                result = times(A, B);
             else % A*B where A is sparseIJV and B is something else
                 % ABij = A(i,:)*B(:,j)
                 
