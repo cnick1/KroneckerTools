@@ -119,7 +119,7 @@ elseif sprse && issparse(f{end})
             
             % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
             % Evaluate x at each index and take product along rows
-            xprod = prod(x(cell2mat(inds)), 2);
+            xprod = prod(reshape(x(cell2mat(inds)), size(cell2mat(inds))), 2);
             
             FofX = FofX + accumarray(Fi, Fv .* xprod, size(x));
         end
