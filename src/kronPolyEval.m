@@ -99,7 +99,7 @@ elseif isa(f,'factoredValueArray')
         xk = kron(xk,x);
         FofX = FofX + f.ReducedValueCoefficients{k}*xk;
     end
-elseif sprse && issparse(f{end})
+elseif sprse && issparse(f{end}) && ~isa(x,'sym')
     %% Evaluate sparse Kronecker polynomial
     % Note: in the case of REPEATED evaluation of THE SAME sparse
     % Kronecker polynomial, consider using sparseIJV class or making a

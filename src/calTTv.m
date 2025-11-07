@@ -1,49 +1,51 @@
 function [Tv] = calTTv(T, m, k, v)
-%calTTv Calculates the term \cT_{m,k}^\top v
+%calTTv Calculates the product 𝓣ₘ,ₖᵀ v ("calligraphic T transpose times v")
+%  𝓣ₘ,ₖ denotes all unique tensor products with m terms and nᵏ columns
 %
 %  Usage:  Tv = calTTv(T,m,k,v)
 %
 %   Inputs:
-%       T  - a cell array of matrices (transformation coefficients).
-%       v  - a vector of dimension n^m
-%       m  - related to dimension of v
-%       k  - related to dimension of the output vector Tv
+%       T  - a cell array of transformation coefficients
+%       m  - number of terms in the tensor product; v has dimension n^m
+%       k  - the tensor products have nᵏ columns; output vector Tv has dimension n^k
+%       v  - a matrix with n^m rows (or a vector of dimension n^m)
 %
 %   Output:
-%       Tv - the vector that results from product "caligraphic T transpose times v".
+%       Tv - the result of the product "calligraphic T transpose times v"
 %
 %   Background: When applying a polynomial transformation to a polynomial
-%   energy function, repeated products appear such as 
-% 
-%                   (T{1} ⊗ T{2} ⊗ ... ⊗T{m}).' * v)
-% 
-%   We introduce the notation \cT = (T{1} ⊗ T{2} ⊗ ... ⊗T{m}); more
-%   specifically, \cT is defined with two subscript indices: m and k. 
+%   energy function, repeated products appear such as
+%
+%                   (T₁⊗T₂⊗... ⊗Tₘ)ᵀ v
+%
+%   We introduce the notation 𝓣 = (T₁⊗T₂⊗... ⊗Tₘ); more
+%   specifically, 𝓣 is defined with two subscript indices: m and k.
 %       - m denotes the number of terms in the Kronecker products; it is
 %         also related to the dimension of the input vector v
-%       - k is related to the dimension of the resultant vector vT
-% 
-%   Examples include 
-%       - \cT_{k,k} = T{1} ⊗ T{1} ⊗ ... ⊗T{1}    (k times)
-%       - \cT_{3,4} = T{1} ⊗ T{1} ⊗ T{2} + T{1} ⊗ T{2} ⊗ T{1} + T{2} ⊗ T{1} ⊗ T{1}
-% 
-%   Hence "\cT_{m,k} denotes all unique tensor products with m terms and 
-%   n^k columns" [1]. In this function, we evaluate the product \cT_{m,k}^\top v
-%   efficiently using the kronecker-vec identity recursively with the 
-%   function kroneckerRight.
-% 
+%       - k is related to the dimension of the resultant vector Tv
+%
+%   Examples include
+%       - 𝓣ₖ,ₖ  = T₁⊗T₁⊗...⊗T₁    (one term, k factors)
+%       - 𝓣₃,₄ = T₁⊗T₁⊗T₂ + T₁⊗T₂⊗T₁ + T₂⊗T₁⊗T₁
+%
+%   Hence "𝓣ₘ,ₖ denotes all unique tensor products with m terms and
+%   n^k columns" [1]. In this function, we evaluate the product 𝓣ₘ,ₖᵀ v
+%   efficiently using the kronecker-vec identity recursively with the
+%   function kroneckerRight. There may be improvements to be made in
+%   kroneckerRight, e.g. to avoid transposition of large matrices.
+%
 %   Author: Rewritten by Nick Corbin, UCSD, based on code by Jeff Borggaard, VT
 %
 %   License: MIT
 
-%   Reference: [1] B. Kramer, S. Gugercin, and J. Borggaard, “Nonlinear 
-%              balanced truncation: Part 2—model reduction on manifolds,” 
+%   Reference: [1] B. Kramer, S. Gugercin, and J. Borggaard, “Nonlinear
+%              balanced truncation: Part 2—model reduction on manifolds,”
 %              arXiv, Feb. 2023. doi: 10.48550/ARXIV.2302.02036
 %
 %  Part of the NLbalancing repository.
 %%
 
-if m == 1 
+if m == 1
     Tv = T{k}.'*v;
     return
 end

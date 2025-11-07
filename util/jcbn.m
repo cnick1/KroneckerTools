@@ -21,6 +21,11 @@ function J = jcbn(F, x, symmetrize)
 %   Kronecker-vec identity to do this recursively and in a more efficient
 %   manner.
 %
+%   One use case for this function is for computing the Jacobian of a
+%   transformation. For example, the Jacobian J(z̄) of the nonlinear balancing
+%   transformation x = ̅Φ(z̄) can be computed using this function if a
+%   polynomial approximation to the transformation is known.
+%
 %   References: [1]
 %
 %   Part of the KroneckerTools repository.
@@ -31,7 +36,7 @@ end
 
 n = size(x, 1);
 
-if symmetrize
+if symmetrize % I'm not sure if this is ever used, could possibly remove
     if isempty(F{1})
         J = 0;
     else
@@ -44,7 +49,7 @@ if symmetrize
         xkm1 = kron(xkm1, x);
         % Need to iterate over n rows to apply kron-vec identity
         for j = 1:n
-            J(j,:) = J(j,:) + k * xkm1.' * reshape(kronMonomialSymmetrize(F{k}(j,:),n,k),n^(k-1),[]); %#ok<AGROW>
+            J(j,:) = J(j,:) + k * xkm1.' * reshape(kronMonomialSymmetrize(F{k}(j,:),n,k),n^(k-1),[]);
         end
     end
 else
@@ -60,7 +65,7 @@ else
         xkm1 = kron(xkm1, x);
         % Need to iterate over n rows to apply kron-vec identity
         for j = 1:n
-            J(j,:) = J(j,:) + k * xkm1.' * reshape(F{k}(j,:),n^(k-1),[]); %#ok<AGROW>
+            J(j,:) = J(j,:) + k * xkm1.' * reshape(F{k}(j,:),n^(k-1),[]);
         end
     end
 end
