@@ -32,6 +32,9 @@ classdef factoredMatrix
     %       - reshape: fake overload, only works for n x n and will just return M
     %       - transpose: M is symmetric, so just returns M
     %       - norm: will call norm(full(M))
+    %
+    %  See also: factoredMatrixInverse, factoredGainArray, factoredValueArray, invertibleMatrix
+    %%
     properties
         Z
     end
@@ -67,7 +70,7 @@ classdef factoredMatrix
                 disp(full(obj))
             else
                 builtin('disp', obj);
-                fprintf("    Call disp(M,true) to display the full M matrix.\n\n")
+                fprintf("    Call disp(%s,true) to display the full matrix.\n\n", inputname(1))
             end
         end
         
@@ -119,7 +122,7 @@ classdef factoredMatrix
             if any(dim1 == n) || any(dim2 == n)
                 result = obj;
             else
-                error("factoredMatrix: M should be a square matrix")
+                error("factoredMatrix: %s should be a square matrix", inputname(1))
             end
         end
         

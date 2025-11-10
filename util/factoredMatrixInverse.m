@@ -1,6 +1,6 @@
 classdef factoredMatrixInverse
     %FACTOREDMATRIXINVERSE An n x n matrix M stored in terms of its inverse square-root factors M = Z*Zᵀ = (Z⁻ᵀ*Z⁻¹)⁻¹.
-    %   See the documentation for factoredMatrix first. That class is set
+    %   See the documentation for <a href="matlab:open factoredMatrix">factoredMatrix</a> first. That class is set
     %   up inspired by the observability energy, which for a linear system
     %   is given by the observability Gramian. The Gramian can be computed
     %   in terms of its Cholesky factor by lyapchol(), which gives
@@ -17,7 +17,7 @@ classdef factoredMatrixInverse
     %   So instead of inverting twice, which is doubly illconditioned, we can
     %   just deal directly with "R⁻¹", which is what lyapchol() gives as
     %   the square-root of the controllability Gramian.
-    
+    %
     %   This class is designed to facilitate handling the matrix V₂, but by
     %   storing only its inverse square-root factor R⁻¹ and never actually
     %   performing any inversions. V₂ is used in two ways:
@@ -75,6 +75,9 @@ classdef factoredMatrixInverse
     %       - reshape: fake overload, only works for n x n and will just return M
     %       - transpose: M is symmetric, so just returns M
     %       - norm: will call norm(full(M))
+    %
+    %  See also: factoredMatrix, factoredGainArray, factoredValueArray, invertibleMatrix
+    %%
     properties
         Zinv
     end
@@ -125,7 +128,7 @@ classdef factoredMatrixInverse
                 disp(full(obj))
             else
                 builtin('disp', obj);
-                fprintf("    Call disp(M,true) to display the full M matrix.\n\n")
+                fprintf("    Call disp(%s,true) to display the full matrix.\n\n", inputname(1))
             end
         end
         
@@ -168,7 +171,7 @@ classdef factoredMatrixInverse
             if any(dim1 == n) || any(dim2 == n)
                 result = obj;
             else
-                error("factoredMatrixInverse: M should be a square matrix")
+                error("factoredMatrixInverse: %s should be a square matrix", inputname(1))
             end
         end
         
