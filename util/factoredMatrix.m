@@ -70,7 +70,8 @@ classdef factoredMatrix
                 disp(full(obj))
             else
                 builtin('disp', obj);
-                fprintf("    Call disp(%s,true) to display the full matrix.\n\n", inputname(1))
+                fprintf('    Call <a href="matlab:disp(%s,true)">disp(%s,true)</a> to display the full matrix.\n\n', inputname(1), inputname(1))
+                
             end
         end
         

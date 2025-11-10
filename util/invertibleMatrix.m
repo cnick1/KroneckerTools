@@ -26,21 +26,21 @@ classdef invertibleMatrix
         M
         Minv
     end
-
+    
     methods
-
+        
         % Constructor
         function obj = invertibleMatrix(M, Minv)
             obj.M = M;
             obj.Minv = Minv;
         end
-
+        
         % Display M and Minv
         function disp(obj, dispFull)
             if nargin < 2
                 dispFull = false;
             end
-
+            
             if dispFull
                 fprintf('  <a href="matlab:open invertibleMatrix">invertibleMatrix</a> with properties:\n')
                 fprintf('  %s = \n', inputname(1))
@@ -49,33 +49,47 @@ classdef invertibleMatrix
                 builtin('disp', obj.Minv);
             else
                 builtin('disp', obj);
-                fprintf("    Call disp(%s,true) to display the full matrix.\n\n", inputname(1))
+                fprintf('    Call <a href="matlab:disp(%s,true)">disp(%s,true)</a> to display the full matrix.\n\n', inputname(1), inputname(1))
             end
         end
-
+        
         % Main overload #1: return inverse directly
         function result = inv(obj)
-            result = obj.Minv;
+            result = obj.Minv; % we could even return an invertibleMatrix object
         end
-
+        
+        % Transpose
+        function result = transpose(obj)
+            result = invertibleMatrix(obj.M.', obj.Minv.');
+        end
+        
+        % Conjugate Transpose
+        function result = ctranspose(obj)
+            result = invertibleMatrix(obj.M', obj.Minv');
+        end
+        
         % Vectorize
         function result = vec(obj)
             result = obj.M(:);
         end
-
+        
         % Standard matrix multiplication
         function result = mtimes(obj, other)
             if isa(obj, 'invertibleMatrix') && isa(other, 'invertibleMatrix')
-                % Both are invertibleMatrix; not planning on using this
-                result = obj.M * other.M;
+                % Both are invertibleMatrix; return another invertibleMatrix
+                % For example with the balancing transformation, the
+                % input-normal/output-diagonal and the scaling
+                % transformations will be invertibleMatrix objects, so this
+                % ensures that the balancing transformation will be as well
+                result = invertibleMatrix(obj.M * other.M, other.Minv * obj.Minv);
             elseif isa(other, 'invertibleMatrix')
                 result = obj * other.M;
             else
                 result = obj.M * other;
             end
         end
-
-        % Left inverse
+        
+        % Main overload #2: Left inverse
         function result = mldivide(obj, other)
             if isa(obj, 'invertibleMatrix')
                 result = obj.Minv * other;
@@ -85,8 +99,8 @@ classdef invertibleMatrix
                 result =  builtin('mldivide', obj, other);
             end
         end
-
-        % Right inverse
+        
+        % Main overload #3: Right inverse
         function result = mrdivide(obj, other)
             if isa(other, 'invertibleMatrix')
                 result = obj * other.Minv;
@@ -96,9 +110,9 @@ classdef invertibleMatrix
                 result =  builtin('mrdivide', obj, other);
             end
         end
-
+        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+        
         %% Standard algebraic operations
         function result = plus(obj, other)
             if isa(other, 'invertibleMatrix')
@@ -109,7 +123,7 @@ classdef invertibleMatrix
             end
             result =  builtin('plus', obj, other);
         end
-
+        
         function result = minus(obj, other)
             if isa(other, 'invertibleMatrix')
                 other = other.M;
@@ -119,32 +133,33 @@ classdef invertibleMatrix
             end
             result =  builtin('minus', obj, other);
         end
-
-        %% Other 
+        
+        %% Other
         function result = det(obj)
             result = det(obj.M);
         end
-
+        
         function result = isemtpy(obj)
             result = isemtpy(obj.M);
         end
-
+        
         function result = length(obj)
             result = length(obj.M);
         end
-
+        
         function result = numel(obj)
             result = numel(obj.M);
         end
-
-        function result = size(obj)
-            result = size(obj.M);
+        
+        function varargout = size(obj, varargin)
+            [varargout{1:nargout}] = size(obj.M, varargin{:});
         end
-
+        
+        
         function result = double(obj)
             result = double(obj.M);
         end
-
+        
     end
-
+    
 end
