@@ -56,7 +56,7 @@ else
     if isempty(F{1})
         J = 0;
     else
-        J = F{1};
+        J = double(F{1});
     end
     
     xkm1 = 1;

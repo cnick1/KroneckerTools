@@ -115,6 +115,11 @@ classdef factoredMatrixInverse
             result = inv(obj.Zinv.' * obj.Zinv);
         end
         
+        function result = double(obj)
+            result = double(full(obj));
+            result = result(:);
+        end
+        
         function result = inv(obj)
             result = obj.Zinv.' * obj.Zinv;
         end

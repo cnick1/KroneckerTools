@@ -58,6 +58,11 @@ classdef invertibleMatrix
             result = obj.Minv; % we could even return an invertibleMatrix object
         end
         
+        % Absolute value
+        function result = abs(obj)
+            result = abs(obj.M);
+        end
+        
         % Transpose
         function result = transpose(obj)
             result = invertibleMatrix(obj.M.', obj.Minv.');

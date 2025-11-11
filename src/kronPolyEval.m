@@ -5,7 +5,7 @@ function [FofX] = kronPolyEval(f,x,d,sprse)
 %
 %   Input Variables:
 %          f - cell array containing function coefficients
-%          x - point at which to evaluate the Jacobian (vector)
+%          x - point at which to evaluate the function (vector)
 %          d - polynomial will be evaluated out to degree=d
 %              (default is the length of f)
 %      sprse - optional; exploit sparsity if it is present

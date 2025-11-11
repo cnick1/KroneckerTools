@@ -61,6 +61,11 @@ classdef factoredMatrix
             result = obj.Z * obj.Z.';
         end
         
+        function result = double(obj)
+            result = double(full(obj));
+            result = result(:);
+        end
+        
         function disp(obj, dispFull)
             if nargin < 2
                 dispFull = false;
