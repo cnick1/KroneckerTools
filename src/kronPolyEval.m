@@ -1,4 +1,4 @@
-function [FofX] = kronPolyEval(f,x,d,sprse)
+function varargout = kronPolyEval(f,x,d,sprse)
 %kronPolyEval Evaluate a Kronecker polynomial f(x) to degree d.
 %
 %   Usage:     FofX = kronPolyEval(f,x,d);
@@ -175,6 +175,16 @@ else
         xk = kron(xk,x);
         FofX  = FofX + f{k}*xk;
     end
+end
+
+
+% Assign output
+if nargout <= 1
+    varargout{1} = FofX;
+else
+    if nargout ~= length(FofX); error('Insufficient number of outputs from right hand side of equal sign to satisfy assignment.'); end
+    FofXcell = num2cell(FofX);
+    [varargout{1:nargout}] = deal(FofXcell{:});
 end
 
 end
