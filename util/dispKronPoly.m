@@ -38,7 +38,7 @@ x = sym(nvp.variable,[nvp.n,1]);
 if ~isa(f{1},'double')
     f{1} = double(f{1});
 end
-if ~isa(f{2},'double')
+if nvp.degree > 1 && ~isa(f{2},'double')
     f{2} = double(f{2});
 end
 

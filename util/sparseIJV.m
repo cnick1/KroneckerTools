@@ -441,8 +441,16 @@ classdef sparseIJV
             n = length(obj.I);
         end
         
-        function n = issparse(~)
-            n = true;
+        function result = isempty(obj)
+            if nnz(obj)
+                result = false;
+            else 
+                result = true;
+            end
+        end
+        
+        function result = issparse(~)
+            result = true;
         end
         
         function result = transpose(obj)
@@ -467,6 +475,9 @@ classdef sparseIJV
                 return
             end
             if isa(other,'sparseIJV')
+                % if 
+                % 
+                % end
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
                 end
