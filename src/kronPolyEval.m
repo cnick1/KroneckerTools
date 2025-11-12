@@ -64,7 +64,7 @@ if lf < d
     error('kronPolyEval: not enough entries in the coefficient cell array')
 end
 if d == 0
-    FofX = 0;
+    varargout = 0;
     return
 end
 
@@ -156,24 +156,22 @@ else
         FofX = f{1}*x;
     end
 
-    if d == 1
-        return;
-    end
-    
-    % Evaluate higher-degree terms successively
-    xk = x; 
-    
-    % k=2 case
-    xk = kron(xk,x); % just to keep track
-    if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
-        FofX  = FofX + x.'*f{2}*x;
-    else
-        FofX  = FofX + f{2}*xk;
-    end
+    if d > 1 % Evaluate higher-degree terms successively
 
-    for k=3:d
-        xk = kron(xk,x);
-        FofX  = FofX + f{k}*xk;
+        xk = x;
+
+        % k=2 case
+        xk = kron(xk,x); % just to keep track
+        if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
+            FofX  = FofX + x.'*f{2}*x;
+        else
+            FofX  = FofX + f{2}*xk;
+        end
+
+        for k=3:d
+            xk = kron(xk,x);
+            FofX  = FofX + f{k}*xk;
+        end
     end
 end
 
