@@ -475,11 +475,12 @@ classdef sparseIJV
                 return
             end
             if isa(other,'sparseIJV')
-                % if 
-                % 
-                % end
                 if obj.M ~= other.M || obj.N ~= other.N
                     error('Matrix dimensions must agree.');
+                end
+                if isempty(obj) && isempty(other)
+                    result = obj; % Sum of two zero arrays
+                    return
                 end
                 
                 % Combine (I, J, V) entries from both objects

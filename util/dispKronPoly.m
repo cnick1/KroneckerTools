@@ -38,13 +38,13 @@ x = sym(nvp.variable,[nvp.n,1]);
 if ~isa(f{1},'double')
     f{1} = double(f{1});
 end
-if nvp.degree > 1 && ~isa(f{2},'double')
+if length(f) > 1 && ~isa(f{2},'double')
     f{2} = double(f{2});
 end
 
 % Round everything below thresh to zero to unclutter the print statement
 for i=1:nvp.degree
-    if isa(f{i},'double') % sparseIJV class gives issues, for now just do the doubles
+    if i <= length(f) && isa(f{i},'double') % sparseIJV class gives issues, for now just do the doubles
         f{i}(abs(f{i}) < nvp.thresh) = 0;
     end
 end

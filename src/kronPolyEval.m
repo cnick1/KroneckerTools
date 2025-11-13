@@ -53,6 +53,7 @@ function varargout = kronPolyEval(f,x,d,sprse)
 %
 %   Part of the KroneckerTools repository.
 %%
+vec = @(X) X(:);
 lf = length(f);
 if nargin < 4
     sprse = true;
@@ -64,7 +65,7 @@ if lf < d
     error('kronPolyEval: not enough entries in the coefficient cell array')
 end
 if d == 0
-    varargout = 0;
+    varargout = {0};
     return
 end
 
@@ -113,15 +114,17 @@ elseif sprse && issparse(f{end}) && ~isa(x,'sym')
     % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
     for k=2:d
         [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars (using sparseIJV helps)
+        Fi = vec(Fi); Fj = vec(Fj); Fv = vec(Fv); % Ensure these are column vectors
         if ~isempty(Fi) % skip all zero coefficients
             inds = cell(1, k); % Preallocate cell array for k indices
+            % inds = cell(k,1); % Preallocate cell array for k indices
             [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
             
             % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
             % Evaluate x at each index and take product along rows
             xprod = prod(reshape(x(cell2mat(inds)), size(cell2mat(inds))), 2);
             
-            FofX = FofX + accumarray(Fi, Fv .* xprod, size(x));
+            FofX = FofX + accumarray(Fi, Fv .* xprod, size(FofX));
         end
     end
 else

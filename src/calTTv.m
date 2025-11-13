@@ -49,6 +49,10 @@ if m == 1
     Tv = T{k}.'*v;
     return
 end
+if ~nnz(v)
+    Tv = sparse(size(T{1}, 2)^k,size(v,2));
+    return
+end
 
 % Get a list of indices
 [indexSet, mult] = findCombinations(m, k);

@@ -1,4 +1,4 @@
-function J = jcbn(F, x, symmetrize)
+function J = jcbn(F, x, nvp)
 %jcbn Return the Jacobian J(x) = ∂f(x)/∂x of the function f(x) evaluated at x.
 %
 %   Usage:  J = jcbn(F, x)
@@ -30,13 +30,15 @@ function J = jcbn(F, x, symmetrize)
 %
 %   Part of the KroneckerTools repository.
 %%
-if nargin < 3
-    symmetrize = false;
-end
+arguments 
+    F cell
+    x = sym('x',[size(F{1},2),1]);
+    nvp.symmetrize = false;
+end 
 
 n = size(x, 1);
 
-if symmetrize % I'm not sure if this is ever used, could possibly remove
+if nvp.symmetrize % I'm not sure if this is ever used, could possibly remove
     if isempty(F{1})
         J = 0;
     else
@@ -57,6 +59,10 @@ else
         J = 0;
     else
         J = double(F{1});
+    end
+
+    if isa(x,'sym')
+        J = sym(J);
     end
     
     xkm1 = 1;
