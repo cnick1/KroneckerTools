@@ -57,6 +57,10 @@ classdef invertibleMatrix
         function result = inv(obj)
             result = obj.Minv; % we could even return an invertibleMatrix object
         end
+
+        function result = full(obj)
+            result = obj.M; 
+        end
         
         % Absolute value
         function result = abs(obj)

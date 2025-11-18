@@ -1,4 +1,4 @@
-function dispKronPoly(f,nvp)
+function s = dispKronPoly(f,nvp)
 %dispKronPoly Display a Kronecker Polynomial, rounding small quantities to zero
 %
 %   Usage:     dispKronPoly(f)
@@ -24,7 +24,7 @@ function dispKronPoly(f,nvp)
 %   print command less cluttered.
 %
 %   TODO: Add support for sparseIJV, factoredMatrix, etc. coefficients
-arguments 
+arguments
     f
     nvp.n = size(f{1},2)
     nvp.variable = "x"
@@ -48,5 +48,11 @@ for i=1:nvp.degree
         f{i}(abs(f{i}) < nvp.thresh) = 0;
     end
 end
-disp(vpa(kronPolyEval(f, x, nvp.degree), 3))
+
+if nargout == 1
+    s = splitlines(evalc('disp(vpa(kronPolyEval(f, x, nvp.degree), 3))'));
+    s = s(1:end-2);
+else
+    disp(vpa(kronPolyEval(f, x, nvp.degree), 3))
+end
 end

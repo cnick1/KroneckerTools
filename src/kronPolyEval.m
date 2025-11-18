@@ -62,7 +62,8 @@ if nargin < 4
     end
 end
 if lf < d
-    error('kronPolyEval: not enough entries in the coefficient cell array')
+    d = lf;
+    % warning('kronPolyEval: not enough entries in the coefficient cell array')
 end
 if d == 0
     varargout = {0};
