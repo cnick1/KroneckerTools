@@ -20,7 +20,7 @@ function [Tv] = calTTv(T, m, k, v)
 %
 %   We introduce the notation 𝓣 = (T₁⊗T₂⊗... ⊗Tₘ); more
 %   specifically, 𝓣 is defined with two subscript indices: m and k.
-%       - m denotes the number of terms in the Kronecker products; it is
+%       - m denotes the number of factors in the Kronecker products; it is
 %         also related to the dimension of the input vector v
 %       - k is related to the dimension of the resultant vector Tv
 %
