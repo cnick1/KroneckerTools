@@ -156,7 +156,7 @@ classdef factoredMatrixInverse
         end
         
         function result = numel(obj)
-            result = length(obj)^2;
+            result = prod(size(obj.Zinv));
         end
         
         function result = length(obj)

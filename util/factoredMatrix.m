@@ -107,7 +107,7 @@ classdef factoredMatrix
         end
         
         function result = numel(obj)
-            result = length(obj)^2;
+            result = prod(size(obj.Z));
         end
         
         function result = length(obj)
