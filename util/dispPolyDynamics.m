@@ -1,4 +1,4 @@
-function s = dispPolyDynamics(f,g,h,nvp)
+function dispPolyDynamics(f,g,h,nvp)
 %dispPolyDynamics Display control-affine polynomial dynamics
 %
 %   Usage:     dispPolyDynamics(f,g,h)
@@ -23,28 +23,86 @@ function s = dispPolyDynamics(f,g,h,nvp)
 %
 %   TODO: Add support for sparseIJV, factoredMatrix, etc. coefficients
 arguments
-    f
-    g
-    h
+    f cell
+    g cell
+    h cell
     nvp.thresh = 1e-7
     nvp.degree = length(f)
+    nvp.variable = "x"
 end
 [p,n] = size(h{1});
+[~,m] = size(g{1});
 
-fs = dispKronPoly(f,thresh=nvp.thresh,degree=nvp.degree);
-if length(g) > 1
-    gs = dispKronPoly(g(2:end),thresh=nvp.thresh,degree=nvp.degree);
-else 
-    gs = num2cell(zeros(1,n));
+% Print the state equation
+fs = dispKronPoly(f,thresh=nvp.thresh,degree=nvp.degree,variable=nvp.variable);
+
+inputScenario = 'linear';
+for i=2:length(g)
+    if nnz(g{i}) > 0
+        inputScenario = 'nonlinear';
+    end
 end
-hs = dispKronPoly(h,thresh=nvp.thresh,degree=nvp.degree);
+switch inputScenario
+    case 'linear'
+        for i=1:n
+            fprintf('      d%s%i/dt = %s',nvp.variable,i,regexprep(fs{i},' +',' '))
+            for j=1:m
+                if abs(g{1}(i,j)) > 1e-7
+                    fprintf(' + %s*u%i',num2str(g{1}(i,j)),j)
+                end
+            end
+            fprintf('\n')
+        end
+    case 'nonlinear'
+        % Convert g(x) to ∑ gᵢ(x)
+        g_j = cell(m,length(g));
+        for j=1:m
+            for k=1:(length(g)-1)
+                g_j{j,k+1} = g{k+1}(:,j:m:end);
+            end
+        end
 
-for i=1:n
-    fprintf('      dx%i/dt = %s + (%s + %s) u\n',i,fs{i},num2str(g{1}(i)),gs{i})
+        for i=1:n
+            % Drift
+            fprintf('      d%s%i/dt = %s',nvp.variable,i,regexprep(fs{i},' +',' '))
+            for j=1:m
+                fprintf(' + (')
+                % Linear inputs
+                if abs(g{1}(i,j)) > 1e-7
+                    fprintf('%s',num2str(g{1}(i,j)))
+                end
+                % Nonlinear inputs
+                gs = dispKronPoly(g_j(j,2:end),thresh=nvp.thresh,degree=nvp.degree,variable=nvp.variable);
+                fprintf(' + %s ',regexprep(gs{i},' +',' '))
+                fprintf(')u%i',j)
+            end
+            fprintf('\n')
+        end
+
+        % for i=1:n
+        %     % Drift
+        %     fprintf('      d%s%i/dt = %s',nvp.variable,i,fs{i})
+        %     % Linear inputs
+        %     for j=1:m
+        %         if abs(g{1}(i,j)) > 1e-7
+        %             fprintf(' + %s*u%i',num2str(g{1}(i,j)),j)
+        %         end
+        %     end
+        %     % Nonlinear inputs
+        %     for j=1:m
+        %         gs = dispKronPoly(g_j(j,2:end),thresh=nvp.thresh,degree=nvp.degree,variable=nvp.variable);
+        %         fprintf(' + %s u%i\n',gs{i},j)
+        %     end
+        %     fprintf('\n')
+        % end
 end
 
+
+
+% Print the output equation
+hs = dispKronPoly(h,thresh=nvp.thresh,degree=nvp.degree,variable=nvp.variable);
 for i=1:p
-    fprintf('          y%i = %s\n',i,hs{i})
+    fprintf('          y%i = %s\n',i,regexprep(hs{i},' +',' '))
 end
 
 

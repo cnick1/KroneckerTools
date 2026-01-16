@@ -1,4 +1,4 @@
-function varargout = kronPolyEval(f,x,d,sprse)
+function varargout = kronPolyEval(f,x,nvp)
 %kronPolyEval Evaluate a Kronecker polynomial f(x) to degree d.
 %
 %   Usage:     FofX = kronPolyEval(f,x,d);
@@ -53,130 +53,152 @@ function varargout = kronPolyEval(f,x,d,sprse)
 %
 %   Part of the KroneckerTools repository.
 %%
+arguments
+    f
+    x
+    nvp.sprse = true
+    nvp.degree = length(f)
+    nvp.scenario = 'standard' % or factoredGainArray or factoredValueArray or sparse
+end
 vec = @(X) X(:);
 lf = length(f);
-if nargin < 4
-    sprse = true;
-    if nargin < 3
-        d = lf;
-    end
-end
-if lf < d
-    d = lf;
-    % warning('kronPolyEval: not enough entries in the coefficient cell array')
-end
-if d == 0
+nvp.degree = min(nvp.degree, lf);
+if nvp.degree == 0
     varargout = {0};
     return
 end
 
 if isa(f,'factoredGainArray')
-    %% Evaluate polynomial feedback law
-    %  u(x) = K₁ x + K₂ᵣ(xᵣ⊗xᵣ) +  K₃ᵣ(xᵣ⊗xᵣ⊗xᵣ) + ... +  Kᵣᵈ⁻¹(...⊗xᵣ) )
-    % using factoredGainArray class and reduced-order xᵣ
-    
-    % Evaluate linear term (can't be empty for u(x))
-    FofX = f{1}*x;
-    
-    % Get reduced-order state xᵣ and evaluate higher-degree terms
-    x = f.Tinv*x; xk = x;
-    for k=2:d
-        xk = kron(xk,x);
-        FofX = FofX + f.ReducedGains{k}*xk;
-    end
+    nvp.scenario = 'factoredGainArray';
 elseif isa(f,'factoredValueArray')
-    %% Evaluate polynomial value function
-    %  V(x) = 1/2 ( v₂ᵀ(x⊗x) + v₃ᵣᵀ(xᵣ⊗xᵣ⊗xᵣ) + ... + vᵣᵈᵀ(...⊗xᵣ) )
-    % using factoredValueArray class and reduced-order xᵣ
-    
-    % Transpose the coefficients v₂ᵀ,...,vᵣᵈᵀ
-    f.ReducedValueCoefficients = cellfun(@transpose,f.ReducedValueCoefficients,'UniformOutput',false);
-    
-    % First term in V(x) is quadratic term
-    FofX = f.ReducedValueCoefficients{2}*kron(x,x);
-    
-    % Get reduced-order state xᵣ and evaluate higher-degree terms
-    x = f.Tinv*x; xk = kron(x,x);
-    for k=3:d
-        xk = kron(xk,x);
-        FofX = FofX + f.ReducedValueCoefficients{k}*xk;
-    end
-elseif sprse && issparse(f{end}) && ~isa(x,'sym')
-    %% Evaluate sparse Kronecker polynomial
-    % Note: in the case of REPEATED evaluation of THE SAME sparse
-    % Kronecker polynomial, consider using sparseIJV class or making a
-    % local sparseKronPolyEval() with additional improvements, such as
-    % persistent variables.
-    n = length(x);
-    
-    % Assume transposition not needed, and assume linear term not empty
-    FofX = f{1}*x;
-    
-    % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
-    for k=2:d
-        [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars (using sparseIJV helps)
-        Fi = vec(Fi); Fj = vec(Fj); Fv = vec(Fv); % Ensure these are column vectors
-        if ~isempty(Fi) % skip all zero coefficients
-            inds = cell(1, k); % Preallocate cell array for k indices
-            % inds = cell(k,1); % Preallocate cell array for k indices
-            [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
-            
-            % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
-            % Evaluate x at each index and take product along rows
-            xprod = prod(reshape(x(cell2mat(inds)), size(cell2mat(inds))), 2);
-            
-            FofX = FofX + accumarray(Fi, Fv .* xprod, size(FofX));
-        end
-    end
-else
-    %% Evaluate standard Kronecker polynomial
-    %% Transpose the coefficients if required
-    % Check dimensions of the last entry in f to see which dimension is the
-    % appropriate size. To multiply, the second dimension  of c{k} has to be
-    % length(x)^k; instead of checking all of them, just check the last
-    % entry, with k=lf=length(f) already having been defined.
-    [nRows, nCols] = size(f{lf});
-    
-    if (length(x)^lf == nCols)
-        % No need to transpose
-    elseif (length(x)^lf == nRows)
-        % Need to transpose, otherwise dimensions will not work
-        f = cellfun(@transpose,f,'UniformOutput',false);
-        %       warning('Coefficient needed to be transposed; consider transposing to speed up.')
-    else
-        % Probably won't ever happen but good contingency
-        % warning('Dimensions of polynomial coefficients are not consistent')
-    end
-    
-    %% Perform polynomial evaluation
-    % Evaluate linear term; handle special case if the linear term is an empty cell
-    if isempty(f{1})
-        n = size(f{2},1); 
-        if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
-            n = 1;
-        end
-        FofX = zeros(n,1);
-    else
-        FofX = f{1}*x;
-    end
+    nvp.scenario = 'factoredValueArray';
+elseif nvp.sprse && issparse(f{end}) && ~isa(x,'sym') && ~strcmp(nvp.scenario,'G(x)')
+    nvp.scenario = 'sparse';
+end
 
-    if d > 1 % Evaluate higher-degree terms successively
+switch nvp.scenario
+    case 'G(x)'
+        %% Evaluate nonlinear input map G(x)
+        %  G(x) = B + G₁ x + G₂(x⊗x) + ...      
+        % Evaluate linear term 
+        m = size(f{1}, 2);
+        FofX = f{1}; 
 
-        xk = x;
-
-        % k=2 case
-        xk = kron(xk,x); % just to keep track
-        if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
-            FofX  = FofX + x.'*f{2}*x;
-        else
-            FofX  = FofX + f{2}*xk;
-        end
-
-        for k=3:d
+        % Evaluate higher-degree terms
+        xk = 1;
+        for k=2:nvp.degree
             xk = kron(xk,x);
-            FofX  = FofX + f{k}*xk;
+            FofX = FofX + f{k}*kron(xk,speye(m));
         end
-    end
+
+    case 'factoredGainArray'
+        %% Evaluate polynomial feedback law
+        %  u(x) = K₁ x + K₂ᵣ(xᵣ⊗xᵣ) +  K₃ᵣ(xᵣ⊗xᵣ⊗xᵣ) + ... +  Kᵣᵈ⁻¹(...⊗xᵣ) )
+        % using factoredGainArray class and reduced-order xᵣ
+
+        % Evaluate linear term (can't be empty for u(x))
+        FofX = f{1}*x;
+
+        % Get reduced-order state xᵣ and evaluate higher-degree terms
+        x = f.Tinv*x; xk = x;
+        for k=2:nvp.degree
+            xk = kron(xk,x);
+            FofX = FofX + f.ReducedGains{k}*xk;
+        end
+
+    case 'factoredValueArray'
+        %% Evaluate polynomial value function
+        %  V(x) = 1/2 ( v₂ᵀ(x⊗x) + v₃ᵣᵀ(xᵣ⊗xᵣ⊗xᵣ) + ... + vᵣᵈᵀ(...⊗xᵣ) )
+        % using factoredValueArray class and reduced-order xᵣ
+
+        % Transpose the coefficients v₂ᵀ,...,vᵣᵈᵀ
+        f.ReducedValueCoefficients = cellfun(@transpose,f.ReducedValueCoefficients,'UniformOutput',false);
+
+        % First term in V(x) is quadratic term
+        FofX = f.ReducedValueCoefficients{2}*kron(x,x);
+
+        % Get reduced-order state xᵣ and evaluate higher-degree terms
+        x = f.Tinv*x; xk = kron(x,x);
+        for k=3:nvp.degree
+            xk = kron(xk,x);
+            FofX = FofX + f.ReducedValueCoefficients{k}*xk;
+        end
+    case 'sparse'
+        %% Evaluate sparse Kronecker polynomial
+        % Note: in the case of REPEATED evaluation of THE SAME sparse
+        % Kronecker polynomial, consider using sparseIJV class or making a
+        % local sparseKronPolyEval() with additional improvements, such as
+        % persistent variables.
+        n = length(x);
+
+        % Assume transposition not needed, and assume linear term not empty
+        FofX = f{1}*x;
+
+        % Evaluate higher-degree terms successively, avoiding forming kron(x,x,...,x) (since it is expensive and only a few entries are needed)
+        for k=2:nvp.degree
+            [Fi, Fj, Fv] = find(f{k}); % this can be expensive, so for repeated solves make a custom function and make these persistent vars (using sparseIJV helps)
+            Fi = vec(Fi); Fj = vec(Fj); Fv = vec(Fv); % Ensure these are column vectors
+            if ~isempty(Fi) % skip all zero coefficients
+                inds = cell(1, k); % Preallocate cell array for k indices
+                % inds = cell(k,1); % Preallocate cell array for k indices
+                [inds{:}] = ind2sub(repmat(n, 1, k), Fj);
+
+                % Efficient sparse evaluation of f{k}*(x⊗...⊗x)
+                % Evaluate x at each index and take product along rows
+                xprod = prod(reshape(x(cell2mat(inds)), size(cell2mat(inds))), 2);
+
+                FofX = FofX + accumarray(Fi, Fv .* xprod, size(FofX));
+            end
+        end
+    case 'standard'
+        %% Evaluate standard Kronecker polynomial
+        %% Transpose the coefficients if required
+        % Check dimensions of the last entry in f to see which dimension is the
+        % appropriate size. To multiply, the second dimension  of c{k} has to be
+        % length(x)^k; instead of checking all of them, just check the last
+        % entry, with k=lf=length(f) already having been defined.
+        [nRows, nCols] = size(f{lf});
+
+        if (length(x)^lf == nCols)
+            % No need to transpose
+        elseif (length(x)^lf == nRows)
+            % Need to transpose, otherwise dimensions will not work
+            f = cellfun(@transpose,f,'UniformOutput',false);
+            %       warning('Coefficient needed to be transposed; consider transposing to speed up.')
+        else
+            % Probably won't ever happen but good contingency
+            % warning('Dimensions of polynomial coefficients are not consistent')
+        end
+
+        %% Perform polynomial evaluation
+        % Evaluate linear term; handle special case if the linear term is an empty cell
+        if isempty(f{1})
+            n = size(f{2},1);
+            if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
+                n = 1;
+            end
+            FofX = zeros(n,1);
+        else
+            FofX = f{1}*x;
+        end
+
+        if nvp.degree > 1 % Evaluate higher-degree terms successively
+
+            xk = x;
+
+            % k=2 case
+            xk = kron(xk,x); % just to keep track
+            if isa(f{2},'factoredMatrix') || isa(f{2},'factoredMatrixInverse')
+                FofX  = FofX + x.'*f{2}*x;
+            else
+                FofX  = FofX + f{2}*xk;
+            end
+
+            for k=3:nvp.degree
+                xk = kron(xk,x);
+                FofX  = FofX + f{k}*xk;
+            end
+        end
 end
 
 
