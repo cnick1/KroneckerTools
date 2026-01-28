@@ -135,7 +135,7 @@ classdef factoredValueArray < matlab.mixin.indexing.RedefinesParen & ...
                 disp(fullCoeffs)
             else
                 builtin('disp', obj);
-                fprintf("    Call disp(v,true) to display the full coefficient array.\n\n")
+                fprintf('    Call <a href="matlab:disp(%s,true)">disp(%s,true)</a> to display the full coefficient array.\n\n', inputname(1), inputname(1))
             end
         end
         

@@ -114,13 +114,9 @@ classdef factoredMatrix
             result = size(obj.Z, 1);
         end
         
-        function result = size(obj,varargin)
+        function varargout = size(obj,varargin)
             n = length(obj);
-            if nargin < 1 || isempty(varargin)
-                result = [n, n];
-            else
-                result = n;
-            end
+            [varargout{1:nargout}] = repmat({n}, 1, nargout);
         end
         
         function result = reshape(obj, dim1, dim2)
