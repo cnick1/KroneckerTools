@@ -51,7 +51,7 @@ end
 
 if nargout == 1
     s = splitlines(evalc('disp(vpa(kronPolyEval(f, x, degree=nvp.degree), 3))'));
-    s = s(1:end-2);
+    s = s(1:nvp.n);
 else
     disp(vpa(kronPolyEval(f, x, degree=nvp.degree), 3))
 end
