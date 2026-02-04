@@ -1,11 +1,10 @@
-function J = jcbn(F, x, nvp)
+function J = jcbn(F, x)
 %jcbn Return the Jacobian J(x) = ∂f(x)/∂x of the function f(x) evaluated at x.
 %
 %   Usage:  J = jcbn(F, x)
 %
 %   Inputs:    F - cell array containing function coefficients
 %              x - point at which to evaluate the Jacobian
-%     symmetrize - boolean, symmetrize rows of F if they aren't symmetric
 %
 %   Description: The Jacobian J(x) is the matrix giving the partial derivatives
 %   ∂f(x)/∂x of the function f(x). The function of interest is a polynomial
@@ -33,46 +32,27 @@ function J = jcbn(F, x, nvp)
 arguments 
     F cell
     x = sym('x',[size(F{1},2),1]);
-    nvp.symmetrize = false;
 end 
 
 n = size(x, 1);
 
-if nvp.symmetrize % I'm not sure if this is ever used, could possibly remove
-    if isempty(F{1})
-        J = 0;
-    else
-        J = 1/2*(F{1}+F{1}.');
-    end
-    
-    xkm1 = 1;
-    for k = 2:length(F)
-        % Using kron-vec identity
-        xkm1 = kron(xkm1, x);
-        % Need to iterate over n rows to apply kron-vec identity
-        for j = 1:n
-            J(j,:) = J(j,:) + k * xkm1.' * reshape(kronMonomialSymmetrize(F{k}(j,:),n,k),n^(k-1),[]);
-        end
-    end
+if isempty(F{1})
+    J = 0;
 else
-    if isempty(F{1})
-        J = 0;
-    else
-        J = double(F{1});
-    end
+    J = double(F{1});
+end
 
-    if isa(x,'sym')
-        J = sym(J);
-    end
-    
-    xkm1 = 1;
-    for k = 2:length(F)
-        % Using kron-vec identity
-        xkm1 = kron(xkm1, x);
-        % Need to iterate over n rows to apply kron-vec identity
-        for j = 1:n
-            J(j,:) = J(j,:) + k * xkm1.' * reshape(F{k}(j,:),n^(k-1),[]);
-        end
+if isa(x,'sym')
+    J = sym(J);
+end
+
+xkm1 = 1;
+for k = 2:length(F)
+    % Using kron-vec identity
+    xkm1 = kron(xkm1, x);
+    % Need to iterate over n rows to apply kron-vec identity
+    for j = 1:n
+        J(j,:) = J(j,:) + k * xkm1.' * reshape(F{k}(j,:),n^(k-1),[]);
     end
 end
 end
