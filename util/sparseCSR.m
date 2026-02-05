@@ -130,7 +130,8 @@ classdef sparseCSR
                         % 2D index: obj(i, j)
                         i = S(1).subs{1};
                         j = S(1).subs{2};
-                        varargout{1} = obj.StoredTransposed(j,i).';
+                        % varargout{1} = obj.StoredTransposed(j,i).'; % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%***********************************
+                        varargout{1} = sparseCSR(obj.StoredTransposed(j,i).'); 
                     else
                         error('Only 1D or 2D indexing supported.')
                     end
@@ -161,7 +162,7 @@ classdef sparseCSR
                     j = S(1).subs{2};
 
                     % Modify transposed sparse array in place, just swapping i and j
-                    obj.StoredTransposed(j, i) = value;
+                    obj.StoredTransposed(j, i) = value.';
                     
                 otherwise
                     obj = builtin('subsasgn', obj, S, value);

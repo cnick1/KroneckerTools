@@ -39,7 +39,7 @@ n = size(x, 1);
 if isempty(F{1})
     J = 0;
 else
-    J = double(F{1});
+    J = full(double(F{1}));
 end
 
 if isa(x,'sym')

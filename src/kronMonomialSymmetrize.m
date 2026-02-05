@@ -49,6 +49,10 @@ if nargin < 3
     k = log(length(c))/log(n);
 end
 
+if ~any(c(:))
+    return
+end
+
 %% Set up symmetrization helper function
     % Get symmetrization indices/parameters once and reuse in the case of
     % symmetrizing many rows/columns
@@ -67,6 +71,10 @@ end
     function v = symmetrizeHelper(v)
         %symmetrizeHelper Performs the gather/scatter averaging operation
         %   Input/Output: v - vector of dimension nᵏ, symmetrized result
+        if ~any(v(:))
+            return
+        end
+
         classsum = accumarray(linclassidx, v);
         avg = classsum ./ classnum;
 
