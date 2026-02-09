@@ -118,9 +118,14 @@ classdef sparseCSR
         end
         
         function varargout = subsref(obj, S)
+            vec = @(x) x(:);
             switch S(1).type
                 case '()'
-                    if isscalar(S(1).subs)
+                    if isscalar(S) && strcmp(S.type, '()') && any(strcmp(S.subs, ':'))
+                        % Return the data linearized
+                        S.subs = flip(S.subs);
+                        varargout{1} = subsref(obj.StoredTransposed, S);
+                    elseif isscalar(S(1).subs)
                         % Linear index: obj(i)
                         idx = S(1).subs{1};
                         if length(idx) > 1; error('sparseCSR: multiple linear indexing not currently supported'); end
@@ -131,7 +136,8 @@ classdef sparseCSR
                         i = S(1).subs{1};
                         j = S(1).subs{2};
                         % varargout{1} = obj.StoredTransposed(j,i).'; % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%***********************************
-                        varargout{1} = sparseCSR(obj.StoredTransposed(j,i).'); 
+                        temp.StoredTransposed = obj.StoredTransposed(j,i);
+                        varargout{1} = sparseCSR(temp); 
                     else
                         error('Only 1D or 2D indexing supported.')
                     end
@@ -169,7 +175,9 @@ classdef sparseCSR
             end
         end
         
-        
+        function result = reshape(obj,M,N)
+            result = reshape(obj.StoredTransposed.',M,N);
+        end
         
         function varargout = size(obj, dim)
             sz = size(obj.StoredTransposed);
@@ -204,7 +212,11 @@ classdef sparseCSR
             
             switch nargout
                 case {0, 1}
-                    [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:}); % for linear indexing, we need to make sure we get the correct indexing by transposing first
+                    if isvector(obj)
+                        [varargout{1:nargout}] = find(obj.StoredTransposed, varargin{:});
+                    else
+                        [varargout{1:nargout}] = find(obj.StoredTransposed.', varargin{:}); % for linear indexing, we need to make sure we get the correct indexing by transposing first
+                    end
                 case {2, 3}
                     [varargout{1:nargout}] = find(obj.StoredTransposed, varargin{:});
                     varargout([1 2]) = varargout([2 1]);

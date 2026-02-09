@@ -5,7 +5,7 @@ function [c] = kronMonomialSymmetrize(c, n, k)
 %
 %   Inputs:
 %      c - vectorized tensor (coefficient of the Kronecker monomial)
-%            (c can also be a matrix of dimension m x nᵏ or nᵏ x m,   
+%            (c can also be a matrix of dimension m x nᵏ or nᵏ x m,
 %              in which case the columns/rows will be symmetrized)
 %      n - number of variables in the monomial
 %      k - degree of the monomial terms (c should have nᵏ entries)
@@ -13,7 +13,7 @@ function [c] = kronMonomialSymmetrize(c, n, k)
 %   Output:
 %      c - symmetrized result
 %
-%   Description: Let Cₖ be a k-way tensor of dimension n, i.e. 
+%   Description: Let Cₖ be a k-way tensor of dimension n, i.e.
 %
 %       Cₖ( n x n x ... x n )
 %          |- k indices -|
@@ -28,23 +28,24 @@ function [c] = kronMonomialSymmetrize(c, n, k)
 %   quadratic monomial xᵀ Q₂ x can be rewritten as q₂ᵀ(x ⊗ x), where
 %   q₂ = vec(Q₂). It is very straightforward to write higher-order monomials
 %   in this way, e.g. for cₖ = vec(Cₖ)
-% 
-%       cₖᵀ( x ⊗ ... ⊗ x ) 
+%
+%       cₖᵀ( x ⊗ ... ⊗ x )
 %           |- k factors -|
-%   
+%
 %   To symmetrize cₖ or Cₖ amounts to a gather/scatter-type operation,
 %   where we collect all of the elements that are equivalent due to
 %   symmetry, average them, and distribute the average to all of the
-%   element locations. The functions tt_ind2sub() and tt_sub2ind() from the 
-%   tensor toolbox [1] perform the operations of finding finding these 
-%   indices. 
+%   element locations. The functions tt_ind2sub() and tt_sub2ind() from the
+%   tensor toolbox [1] perform the operations of finding finding these
+%   indices.
 %
 %
-%   References: [1] Brett W. Bader, Tamara G. Kolda and others, Tensor Toolbox 
+%   References: [1] Brett W. Bader, Tamara G. Kolda and others, Tensor Toolbox
 %               for MATLAB, Version 3.5, www.tensortoolbox.org, February 25, 2023.
 %
 %  Part of the KroneckerTools repository.
 %%
+vec = @(x) x(:);
 if nargin < 3
     k = log(length(c))/log(n);
 end
@@ -54,55 +55,66 @@ if ~any(c(:))
 end
 
 %% Set up symmetrization helper function
-    % Get symmetrization indices/parameters once and reuse in the case of
-    % symmetrizing many rows/columns
+% Get symmetrization indices/parameters once and reuse in the case of
+% symmetrizing many rows/columns
 
-    % Construct matrix ind where each row is the multi-index for one element of X
-    idx = tt_ind2sub(ones(1, k) * n, (1:n ^ k)');
-    
-    % Find reference index for every element in the tensor - this is to its
-    % index in the symmetrized tensor. This puts every element into a 'class'
-    % of entries that will be the same under symmetry.
-    classidx = sort(idx, 2); % Normalize to one permutation, i.e. reference element
-    mult = [1 cumprod(ones(1, k - 1) * n)]; % Form shifts
-    linclassidx = (classidx - 1) * mult' + 1; % Form vector that maps to the reference elements
-    classnum = accumarray(linclassidx, 1);
-
-    function v = symmetrizeHelper(v)
-        %symmetrizeHelper Performs the gather/scatter averaging operation
-        %   Input/Output: v - vector of dimension nᵏ, symmetrized result
-        if ~any(v(:))
-            return
-        end
-
-        classsum = accumarray(linclassidx, v);
-        avg = classsum ./ classnum;
-
-        % Fill in each entry with its new symmetric version
-        v = avg(linclassidx);
-    end
-
-
-%% Perform actual symmetrization
+% Construct matrix ind where each row is the multi-index for one element of X
 try
-    if isvector(c)
-        c = symmetrizeHelper(c);
-    else
-        if size(c,2) == n^k                      % symmetrize the rows of c
-                for i=1:size(c,1)
-                    c(i,:) = symmetrizeHelper(c(i,:));
-                end
-        elseif size(c,1) == n^k               % symmetrize the columns of c
-                for i=1:size(c,2)
-                    c(:,i) = symmetrizeHelper(c(:,i));
-                end
-        else
-            error('kronMonomialSymmetrize: Dimension mismatch, either the columns or rows of c have to have dimension nᵏ')
-        end
-    end
+    idx = tt_ind2sub(ones(1, k) * n, (1:n ^ k)');
 catch
     error('kronMonomialSymmetrize: Something went wrong; did you clone the tensor_toolbox repo and add it to path?')
 end
 
+% Find reference index for every element in the tensor - this is to its
+% index in the symmetrized tensor. This puts every element into a 'class'
+% of entries that will be the same under symmetry.
+classidx = sort(idx, 2); clear idx; % Normalize to one permutation, i.e. reference element
+mult = [1 cumprod(ones(1, k - 1) * n)]; % Form shifts
+linclassidx = (classidx - 1) * mult' + 1; clear mult classidx % Form vector that maps to the reference elements
+classnum = sparse(accumarray(linclassidx, 1));
+
+%% Perform actual symmetrization
+if isvector(c)
+    c = symmetrizeHelper(c,linclassidx,classnum);
+else
+    if size(c,2) == n^k                      % symmetrize the rows of c
+        for i=1:size(c,1)
+            if any(c(i,:))
+                c(i,:) = symmetrizeHelper(c(i,:),linclassidx,classnum);
+            end
+        end
+    elseif size(c,1) == n^k               % symmetrize the columns of c
+        for i=1:size(c,2)
+            c(:,i) = symmetrizeHelper(c(:,i),linclassidx,classnum);
+        end
+    else
+        error('kronMonomialSymmetrize: Dimension mismatch, either the columns or rows of c have to have dimension nᵏ')
+    end
 end
 
+end
+
+
+function v = symmetrizeHelper(v,linclassidx,classnum)
+%symmetrizeHelper Performs the gather/scatter averaging operation
+%   Input/Output: v - vector of dimension nᵏ, symmetrized result
+if ~any(v)
+    return
+end
+
+classsum = accumarray(linclassidx, v);
+
+% Option 2: 
+if issparse(v)
+    [I,J,~] = find(classsum);
+    avg = sparse(I,J,classsum(I) ./ classnum(I),length(v),1);
+else
+    avg = zeros(size(v));
+    I = find(classsum);
+    avg(I) = classsum(I) ./ classnum(I);
+end
+
+
+% Fill in each entry with its new symmetric version
+v = avg(linclassidx);
+end
